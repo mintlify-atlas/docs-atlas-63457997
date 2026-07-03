@@ -1,0 +1,104 @@
+---
+title: "GraphQL API Overview for Plataforma Social"
+sidebarTitle: "Overview"
+description: "Apollo Server 4 GraphQL API over Express. All operations go through a single POST /graphql endpoint with JSON request bodies."
+---
+
+Plataforma Social exposes its data layer through a single GraphQL endpoint powered by **Apollo Server 4**, mounted on an Express application. Every operation — whether reading data or making changes — is sent as a `POST` request to `/graphql`. There are no REST routes; the entire API surface is described by the GraphQL schema.
+
+## Endpoint
+
+All requests are sent to the following endpoint:
+
+```
+POST /graphql
+```
+
+Default development URL:
+
+```
+http://localhost:4005/graphql
+```
+
+The port is controlled by the `PORT` environment variable and falls back to `4005` when it is not set.
+
+## Making Requests
+
+Every operation is a `POST` request with a JSON body containing a `query` string and, when needed, a `variables` object. The `Content-Type` header must be set to `application/json`.
+
+```bash
+curl -X POST http://localhost:4005/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "query { getUsers { id username email } }"}'
+```
+
+To pass variables alongside an operation, include them in the same JSON body:
+
+```bash
+curl -X POST http://localhost:4005/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "query GetUser($id: String!) { getUser(id: $id) { id username email } }",
+    "variables": { "id": "your-user-uuid" }
+  }'
+```
+
+## Apollo Sandbox (GraphQL Playground)
+
+When the server is running, opening `http://localhost:4005/graphql` in a browser launches the **Apollo Sandbox** — an interactive IDE where you can browse the schema, compose queries, and inspect responses in real time. No additional configuration is required.
+
+<Tip>
+  The Apollo Sandbox is available in any environment where the server is running. It reads the live schema directly from the endpoint, so the documentation it shows always reflects the current API.
+</Tip>
+
+## Authentication
+
+The API itself does **not** require authentication headers on requests. Authentication is handled by **NextAuth** on the frontend. The `login` query exists specifically to support NextAuth's credentials provider: it looks up a user by email address and returns the hashed password so that NextAuth can verify it with bcrypt server-side.
+
+<Note>
+  Client-facing code should never request the `password` field directly. The `login` query is intended to be called only from the NextAuth `authorize` callback on the server.
+</Note>
+
+## Error Handling
+
+When an operation fails, Apollo Server returns an `errors` array in the response body. Each error object contains a human-readable `message` and an `extensions` object with a machine-readable `code` and the corresponding HTTP status.
+
+| Code | HTTP Status | Meaning |
+|------|-------------|---------|
+| `NOT_FOUND` | `404` | The requested user does not exist |
+| Standard GraphQL error | `400` | Validation failure (e.g. duplicate username or email) |
+
+A typical error response looks like this:
+
+```json
+{
+  "errors": [
+    {
+      "message": "El usuario no fue encontrado",
+      "extensions": {
+        "code": "NOT_FOUND",
+        "http": { "status": 404 }
+      }
+    }
+  ]
+}
+```
+
+<Note>
+  When a `NOT_FOUND` error is thrown, the `data` field for that operation will be `null`. Other fields in the same query that succeeded will still be present.
+</Note>
+
+## CORS
+
+The server applies the `cors()` middleware with its default configuration, which allows requests from **all origins**. No special headers are required on the client side to communicate with the API from a browser.
+
+## Reference
+
+<CardGroup cols={2}>
+  <Card title="Queries" icon="magnifying-glass" href="/api/queries">
+    Browse `getUsers`, `getUser`, and `login` — all read operations available in the API.
+  </Card>
+  <Card title="Mutations" icon="pen-to-square" href="/api/mutations">
+    Browse `postUser`, `putUser`, and `deleteUser` — all write operations available in the API.
+  </Card>
+</CardGroup>

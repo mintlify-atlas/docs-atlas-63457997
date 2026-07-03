@@ -1,47 +1,127 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Plataforma Social"
+sidebarTitle: "Quickstart"
+description: "Set up the Plataforma Social backend and Next.js frontend on your local machine in minutes, from cloning the repo to your first GraphQL query."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+This guide walks you through cloning the repository, configuring environment variables, and running both the Express/Apollo GraphQL server and the Next.js frontend locally. By the end you will have a fully working development environment with the API available at `http://localhost:4005/graphql` and the UI at `http://localhost:3000`.
 
 ## Prerequisites
 
-Before you begin, you must have:
+Before you begin, make sure the following are installed and available on your machine:
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+- **Node.js 18 or later** — required by both the server (TypeScript/ESM) and the Next.js 14 frontend
+- **MySQL database** — a running instance you can connect to with a valid connection string
+- **Git** — to clone the repository
 
-## Get started
+## Setup Steps
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Clone the repository">
+    Clone the project from GitHub and navigate into the project root:
 
     ```bash
-    npm install your-package
+    git clone https://github.com/Avendaosander/Plataforma-social.git
+    cd Plataforma-social
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Install server dependencies">
+    Move into the `server` directory and install all Node.js dependencies:
 
     ```bash
-    your-cli init
+    cd server && npm install
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Configure the server environment">
+    Create a `.env` file inside the `server` directory with your MySQL connection string:
 
     ```bash
-    your-cli start
+    # server/.env
+    DATABASE_URL="mysql://USER:PASSWORD@HOST:PORT/DATABASE"
     ```
+
+    Replace `USER`, `PASSWORD`, `HOST`, `PORT`, and `DATABASE` with the credentials for your MySQL instance. Then generate the Prisma client and run the initial migration:
+
+    ```bash
+    npm run generate
+    npm run migrate
+    ```
+
+    `npm run generate` creates the type-safe Prisma client from `schema.prisma`, and `npm run migrate` applies the schema to your database (creating all tables).
+  </Step>
+
+  <Step title="Start the server">
+    Start the development server with hot-reload via nodemon:
+
+    ```bash
+    npm run dev
+    ```
+
+    The server listens on port **4005** by default (or the value of `process.env.PORT`). You should see:
+
+    ```
+    Server running in port http://localhost:4005
+    ```
+
+    The GraphQL endpoint is available at `http://localhost:4005/graphql`.
+  </Step>
+
+  <Step title="Install frontend dependencies">
+    Open a new terminal, navigate to the `frontend` directory, and install dependencies:
+
+    ```bash
+    cd ../frontend && npm install
+    ```
+  </Step>
+
+  <Step title="Configure the frontend environment">
+    Create a `.env.local` file inside the `frontend` directory:
+
+    ```bash
+    # frontend/.env.local
+    NEXTAUTH_SECRET="your-random-secret-string"
+    NEXTAUTH_URL="http://localhost:3000"
+    API_ROUTE="http://localhost:4005/graphql"
+    ```
+
+    - `NEXTAUTH_SECRET` — a random string used to sign NextAuth session tokens (any secure random value works)
+    - `NEXTAUTH_URL` — the canonical URL of the Next.js app, used by NextAuth for redirects
+    - `API_ROUTE` — the full URL of the GraphQL endpoint that Apollo Client will send requests to
+  </Step>
+
+  <Step title="Start the frontend">
+    Run the Next.js development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    The frontend is now available at `http://localhost:3000`. Navigating to `/home` will redirect unauthenticated users to the sign-in page (protected by Next.js middleware).
   </Step>
 </Steps>
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+  The Apollo Server GraphQL playground (Sandbox) is available in your browser at [http://localhost:4005/graphql](http://localhost:4005/graphql). You can use it to explore the schema, run queries, and inspect resolver responses interactively — no additional tooling required.
 </Tip>
+
+<Note>
+  The default server port is **4005**, defined in `server/src/index.ts` as `const PORT = process.env.PORT || 4005`. You can override it by setting a `PORT` variable in `server/.env`.
+</Note>
+
+## Quick Test
+
+Once both services are running, send the following query in the GraphQL playground or any GraphQL client to confirm the server is up and the database connection is working:
+
+```graphql
+query {
+  getUsers {
+    id
+    username
+    email
+  }
+}
+```
+
+A successful response returns an array of registered users (empty array `[]` on a fresh database). Any connection or schema error at this stage usually points to an incorrect `DATABASE_URL` or a skipped migration step.

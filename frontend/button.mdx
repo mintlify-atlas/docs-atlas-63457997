@@ -1,0 +1,132 @@
+---
+title: "Button Component: Variants, Colors, and Sizes"
+sidebarTitle: "Button"
+description: "Composable Button component with solid, outline, flat, and ghost variants across primary, secondary, and destructive color tokens."
+---
+
+The Button component wraps a native HTML `<button>` element with a composable set of style variants. It uses `clsx` and `tailwind-merge` for class resolution, meaning any `className` you pass is merged cleanly with the internal variant classes — no specificity conflicts. The component accepts all standard HTML button attributes via `...rest`, so `onClick`, `type`, `disabled`, `aria-*`, and any other native attribute work out of the box.
+
+```tsx
+import Button from "@/components/ui/Button"
+```
+
+## Props
+
+<ParamField path="variant" type='"solid" | "outline" | "flat" | "ghost"' default='"solid"'>
+  Controls the visual style of the button. `solid` renders a filled background, `outline` renders a transparent background with a colored ring border, `flat` uses a lightly tinted background at reduced opacity, and `ghost` renders text only with no background.
+</ParamField>
+
+<ParamField path="color" type='"primary" | "secondary" | "destructive"' default='"primary"'>
+  Maps to the project's custom Tailwind color palette. `primary` uses the `seagreen` scale, `secondary` uses the `biscay` (blue) scale, and `destructive` uses the `maroon` (red) scale.
+</ParamField>
+
+<ParamField path="size" type='"sm" | "md" | "lg"' default='"md"'>
+  Controls the font size of the button label. `sm` = `text-sm`, `md` = `text-base`, `lg` = `text-lg`. Padding is not affected by `size` — use `className` to override padding directly.
+</ParamField>
+
+<ParamField path="marginX" type='"none" | "auto"' default='"none"'>
+  Sets horizontal margin. `"auto"` applies `mx-auto` for centering the button within a flex or block container. `"none"` applies `mx-0`.
+</ParamField>
+
+<ParamField path="shape" type='"none" | "sm" | "md" | "lg" | "full"' default='"md"'>
+  Controls the border radius. `"none"` = square corners (`rounded-none`), `"sm"` = `rounded-lg`, `"md"` = `rounded-xl`, `"lg"` = `rounded-2xl`, `"full"` = pill shape (`rounded-full`).
+</ParamField>
+
+<ParamField path="isOnlyIcon" type="boolean" default="false">
+  When `true`, overrides the default horizontal padding to `m-0`, preventing extra spacing around an icon-only button. Use this when `children` is omitted and only `startContent` or `endContent` is rendered.
+</ParamField>
+
+<ParamField path="startContent" type="ReactNode">
+  A React node rendered before the button label inside the `<button>` element. Commonly used for leading icons.
+</ParamField>
+
+<ParamField path="endContent" type="ReactNode">
+  A React node rendered after the button label inside the `<button>` element. Commonly used for trailing icons or badges.
+</ParamField>
+
+<ParamField path="...rest" type="React.ButtonHTMLAttributes<HTMLButtonElement>">
+  All standard HTML button attributes — `onClick`, `type`, `disabled`, `aria-label`, `form`, etc. — are forwarded directly to the underlying `<button>` element.
+</ParamField>
+
+## Variants
+
+The four variant options each have distinct visual semantics. All variants support the same three `color` values and respect dark mode automatically.
+
+| Variant   | Light mode                                              | Dark mode override                          |
+| --------- | ------------------------------------------------------- | ------------------------------------------- |
+| `solid`   | Filled background matching the color token              | `primary` switches from `seagreen` to `storm-900` |
+| `outline` | Transparent fill + `ring-2` border in the color token   | No automatic override — use `className`     |
+| `flat`    | 20% opacity fill of the color token                     | `primary` shifts to `storm-300/20`; `secondary` to full `biscay-950` |
+| `ghost`   | Text color only, no background or border                | `primary` text switches to `white`          |
+
+### Color palette reference
+
+The three `color` values map to custom Tailwind color scales defined in `tailwind.config.ts`:
+
+- **`primary`** → `seagreen` scale (`seagreen-900` for backgrounds, `seagreen-900` for text/ring)
+- **`secondary`** → `biscay` scale (deep blue, `biscay-950`)
+- **`destructive`** → `maroon` scale (red, `maroon-900`)
+
+## Usage
+
+<CodeGroup>
+
+```tsx Solid Primary
+<Button variant="solid" color="primary">
+  Save Changes
+</Button>
+```
+
+```tsx Outline Destructive
+<Button variant="outline" color="destructive">
+  Delete
+</Button>
+```
+
+```tsx With Icon
+<Button
+  variant="flat"
+  color="secondary"
+  shape="full"
+  startContent={<PlusIcon />}
+  className="px-3 py-0.5"
+>
+  Create
+</Button>
+```
+
+```tsx Icon Only
+<Button
+  variant="outline"
+  color="primary"
+  shape="sm"
+  isOnlyIcon
+  className="px-1 py-1"
+  startContent={<ShareRightIcon />}
+/>
+```
+
+</CodeGroup>
+
+## Dark Mode
+
+Dark mode is driven by Tailwind's `class` strategy (`darkMode: 'class'` in `tailwind.config.ts`). The `dark` class is toggled on `<html>` at runtime — see `ButtonDarkMode.tsx` for the reference implementation.
+
+<Note>
+  The `solid` + `primary` combination automatically switches its background from `bg-seagreen-900` to `bg-storm-900` in dark mode — no extra className needed.
+</Note>
+
+<Tip>
+  The `outline` variant does not apply an automatic dark mode override. When using `outline` on a dark background (e.g., inside a card), add `dark:bg-inherit dark:ring-white dark:text-white` via `className` to maintain contrast. This pattern is used in `CardPost` for the follow button:
+
+  ```tsx
+  <Button
+    variant="outline"
+    color="primary"
+    shape="md"
+    className="px-3 py-0.5 dark:bg-inherit dark:ring-white dark:text-white"
+  >
+    Seguir
+  </Button>
+  ```
+</Tip>

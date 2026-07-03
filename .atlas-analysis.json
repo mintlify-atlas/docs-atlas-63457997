@@ -1,0 +1,111 @@
+{
+  "projectType": "saas",
+  "projectName": "Plataforma Social",
+  "projectDescription": "A full-stack social platform for sharing and discovering open-source UI components, built with Next.js 14, GraphQL (Apollo), Prisma, MySQL, and NextAuth.",
+  "theme": "luma",
+  "primaryColor": "#1b4246",
+  "lightColor": "#a2d843",
+  "darkColor": "#09262a",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/components-feed",
+              "features/authentication",
+              "features/profiles",
+              "features/search"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment",
+              "configuration/database",
+              "configuration/nextauth"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "GraphQL API",
+            "pages": [
+              "api/overview",
+              "api/queries",
+              "api/mutations"
+            ]
+          },
+          {
+            "group": "Data Model",
+            "pages": [
+              "api/schema",
+              "api/types"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Frontend",
+        "groups": [
+          {
+            "group": "UI Components",
+            "pages": [
+              "frontend/button",
+              "frontend/input",
+              "frontend/card-post"
+            ]
+          },
+          {
+            "group": "Pages & Routing",
+            "pages": [
+              "frontend/pages",
+              "frontend/navigation"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Social feed for sharing open-source UI components",
+    "User authentication with NextAuth credentials provider",
+    "GraphQL API powered by Apollo Server and Prisma ORM",
+    "MySQL database with migrations via Prisma",
+    "User profiles with avatar, bio, followers, and following",
+    "Component posts with tech stack tags, ratings, and comments",
+    "Search and filter components by technology",
+    "Notifications system (desktop and email) with per-user settings",
+    "Dark mode support via Tailwind CSS",
+    "Reusable UI component library (Button, Input, CardPost, Navbar)"
+  ],
+  "publicApiSurface": [
+    "Query: getUsers",
+    "Query: getUser(id: String!)",
+    "Query: login(email: String!)",
+    "Mutation: postUser(username, email, password)",
+    "Mutation: putUser(id, username, description, avatar)",
+    "Mutation: deleteUser(id: String!)",
+    "Type: User { id, username, email, password, description, avatar }",
+    "Type: Setting { idSettings, idUser, private, n_ratings, n_comments, n_followers, n_populates, n_email_ratings, n_email_comments, n_email_followers }",
+    "Type: UserWithSettings { ...User, Setting }",
+    "Type: ResponseID { id }",
+    "GraphQL endpoint: POST /graphql",
+    "NextAuth route: /api/auth/[...nextauth]",
+    "Apollo Client (client-side): ApolloWrapper, getClient",
+    "Frontend GraphQL operations: LOGIN, GET_USER, GET_USERS, POST_USER, PUT_USER"
+  ]
+}

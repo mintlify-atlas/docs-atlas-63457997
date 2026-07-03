@@ -1,0 +1,189 @@
+---
+title: "Component Feed: Browse and Rate UI Contributions"
+sidebarTitle: "Components Feed"
+description: "The main feed where authenticated users browse, rate, comment on, and share open-source UI component posts contributed by the community."
+---
+
+The component feed at `/home` is the heart of Plataforma Social — a scrollable list of community-submitted UI components where you can discover new contributions, follow their authors, rate quality, leave comments, and save posts for later. Every interaction is available inline without leaving the feed, and clicking any post title opens the full detail view with source code.
+
+## How the Feed Works
+
+The `/home` page renders a vertical list of `CardPost` components alongside a search bar powered by `InputWithIcon`. Typing in the search bar and submitting pushes the query to `/home/search`:
+
+```typescript
+// frontend/app/home/page.tsx
+function Home() {
+  const [searchText, setSearchText] = useState('')
+  const router = useRouter();
+
+  const handleSubmit = () => {
+    router.push(`/home/search?query=${encodeURIComponent(searchText)}`);
+  }
+
+  return (
+    <>
+      <section className='flex flex-col items-center w-full gap-5'>
+        <InputWithIcon
+          type='text'
+          placeholder='Buscar'
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          endContent={<SearchIcon className='size-5' />}
+          onSubmit={handleSubmit}
+        />
+        <CardPost/>
+        <CardPost/>
+        <CardPost/>
+        <CardPost/>
+      </section>
+      <Button
+        className='fixed bottom-5 right-5 px-3'
+        startContent={<PlusIcon />}
+      >
+        Crear
+      </Button>
+    </>
+  )
+}
+```
+
+A floating **Crear** button is pinned to the bottom-right corner of both `/home` and `/home/search`, giving authors quick access to post a new component from any feed view.
+
+## CardPost Anatomy
+
+Each `CardPost` card is a self-contained `<article>` element that surfaces the most important information about a component at a glance. Here is a breakdown of every section rendered by `CardPost`:
+
+<CardGroup cols={2}>
+  <Card title="Header" icon="user">
+    Displays the author's avatar (`UserIcon` fallback), a clickable username linking to `/home/profile/:id`, and an inline **Seguir / Siguiendo** toggle button so you can follow the author without navigating away. The relative post timestamp (e.g. `18hrs`) is right-aligned.
+  </Card>
+  <Card title="Title & Description" icon="text">
+    The post title is a `<Link>` to `/home/post` for the full detail view. The description is truncated to **290 characters** using the `truncateText` utility to keep the feed scannable, with an ellipsis appended when the text is cut.
+  </Card>
+  <Card title="Tech Stack Tags" icon="tag">
+    Pill-shaped buttons rendered for each technology in the post's `Stack`. Each tag is wrapped in a `<Link href='/home/search?tech=tecnologia'>` so clicking a tag immediately filters the search results to that technology.
+  </Card>
+  <Card title="Component Preview" icon="image">
+    A thumbnail `<Image>` (120 × 120 px) of the component alongside a **Vista Previa** button. The preview is placed in the right column opposite the description and tags.
+  </Card>
+</CardGroup>
+
+### CardPost Footer
+
+The footer sits below a divider and holds all interaction controls:
+
+| Control | Component | Description |
+|---|---|---|
+| Star rating | `StarIcon` (×5) | Yellow filled stars reflecting the aggregate score; numeric value shown alongside (e.g. `3.2`) |
+| Comment count | `MessageIcon` | Icon and count of comments on the post |
+| Share | `ShareIcon` | Share the post link |
+| Bookmark | `BookmarkPlusIcon` | Save the post for later |
+
+### `truncateText` Utility
+
+The description preview is clipped by this helper defined at the top of `CardPost.tsx`:
+
+```typescript
+// frontend/app/components/ui/CardPost.tsx
+function truncateText(text: string, maxLength: number) {
+  if (text.length <= maxLength) {
+    return text
+  }
+  return text.slice(0, maxLength - 3) + "..."
+}
+```
+
+The feed calls `truncateText(description, 290)`, meaning any description longer than 290 characters is sliced and suffixed with `"..."`.
+
+## Post Detail Page (`/home/post`)
+
+Clicking a post title navigates to the full detail view. The page is split into a main content column (max width `3xl`, offset to leave room for the comments panel) and a fixed right-side comments sidebar.
+
+<Accordion title="Main content column layout">
+  The detail view assembles post content in this order:
+
+  1. **Title** — large `<h2>` at the top
+  2. **Full description** — unrestricted paragraph, up to `80ch` wide
+  3. **Developer info section** — author avatar (120 × 120 px `<Image>`), "Desarrollado por" username, publication date, and a row of tech-stack tag buttons styled with `bg-biscay-600/80 text-white`
+  4. **Stats bar** — five `StarIcon` elements with the aggregate rating and numeric score, plus an action menu toggled by `DotsIcon`
+  5. **Code block** — file name header with a **Descargar archivo** button; the code itself is displayed inside a dark `bg-storm-900` container
+</Accordion>
+
+### Action Menu (DotsIcon)
+
+The stats bar includes a `DotsIcon` button that toggles `isMore` state. When expanded, three additional action buttons appear:
+
+```typescript
+// frontend/app/home/post/page.tsx
+const [isMore, setIsMore] = useState(false)
+const handleMore = () => {
+  setIsMore(!isMore)
+}
+
+// Rendered when isMore === true:
+{isMore && (
+  <>
+    <Button startContent={<ShareIcon className='size-5' />}>
+      Compartir
+    </Button>
+    <Button startContent={<EditIcon className='size-5' />}>
+      Editar
+    </Button>
+    <Button color='destructive' startContent={<TrashIcon className='size-5' />}>
+      Eliminar
+    </Button>
+  </>
+)}
+```
+
+### Comments Sidebar
+
+A fixed right panel (`max-w-[300px]`) is always visible on the post detail page. It shows a **Comentarios** heading with the total comment count, a scrollable list of existing comments, and an `InputWithIcon` field (with `MessagePlusIcon`) at the bottom for submitting a new comment.
+
+```typescript
+// frontend/app/home/post/page.tsx
+<section className="fixed right-5 top-5 bottom-5 w-full max-w-[300px] flex flex-col gap-3
+                    bg-seagreen-900 text-white rounded-lg p-3 dark:ring-1 dark:ring-white dark:bg-transparent">
+  <div className="flex flex-col items-center justify-between h-full gap-5">
+    <div className="relative w-full text-center">
+      <h4 className="text-xl font-semibold">Comentarios</h4>
+      <span className="absolute top-1 right-3 text-sm font-light">10</span>
+    </div>
+    <div className="flex flex-col gap-3 py-5 border-t border-white/40 w-full h-full">
+      {/* comment list */}
+    </div>
+    <InputWithIcon
+      endContent={<MessagePlusIcon/>}
+      onSubmit={() => {}}
+      type="text"
+      placeholder="Deja tu comentario aqui"
+    />
+  </div>
+</section>
+```
+
+## Rating System
+
+Ratings are stored in the `Rating` model (one row per user per post) and aggregated into a floating-point score displayed on every card and post detail view.
+
+```prisma
+// server/prisma/schema.prisma
+model Rating {
+  id     String @id @default(uuid())
+  post   Post   @relation(fields: [idPost], references: [id], onDelete: Cascade)
+  idPost String
+  user   User   @relation(fields: [idUser], references: [id], onDelete: Cascade)
+  idUser String
+  rating Float
+}
+```
+
+<Info>
+  The rating scale is **1 – 5 stars**. The aggregated decimal score (e.g. `3.2`) is derived server-side and returned with the post data. Filled yellow stars (`fill-yellow-400 stroke-yellow-400`) indicate the rounded integer portion of the score.
+</Info>
+
+## Creating a Post
+
+<Tip>
+  The floating **Crear** button (fixed `bottom-5 right-5`) appears on both `/home` and `/home/search`. It links to the post creation form where you can supply a title, full description, tech-stack tags, a component preview image, and the source-code file.
+</Tip>

@@ -1,0 +1,195 @@
+---
+title: "Configure NextAuth Credentials Authentication"
+sidebarTitle: "NextAuth Config"
+description: "How NextAuth.js is configured in Plataforma Social: the credentials provider, JWT and session callbacks, custom pages, and route protection."
+---
+
+Plataforma Social uses [NextAuth.js](https://next-auth.js.org/) for authentication. Rather than delegating to an OAuth provider, it implements a **Credentials provider** that calls the project's own GraphQL API, verifies the user's password with `bcrypt`, and then issues a signed JWT session. The entire configuration is exported from a single file and wired into Next.js as a catch-all API route handler.
+
+## Configuration file
+
+All NextAuth logic lives at:
+
+```text
+frontend/app/api/auth/[...nextauth]/route.ts
+```
+
+The file exports an `authOptions` object typed as `NextAuthOptions` and a `handler` that is re-exported as both `GET` and `POST` to satisfy the Next.js 14 App Router convention:
+
+```typescript
+const handler = NextAuth(authOptions)
+export { handler as GET, handler as POST }
+```
+
+The `authOptions` object configures four areas: the credentials provider, JWT and session callbacks, custom page routes, and the signing secret.
+
+---
+
+## Credentials provider
+
+The provider accepts two fields — `email` and `password` — and its `authorize` function is responsible for validating them against the backend.
+
+<ParamField path="email" type="string" required>
+  The user's email address. Passed directly to the GraphQL `login` query as a variable.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  The user's plain-text password. Never sent to the server — it is compared locally against the hashed password returned by GraphQL using `bcrypt.compare`.
+</ParamField>
+
+### Authorization flow
+
+The `authorize` function performs the following steps:
+
+<Steps>
+  <Step title="Call the GraphQL login query">
+    The function serialises the `LOGIN` GraphQL document (imported from `app/lib/graphql/users`) using `graphql`'s `print` helper and sends it via `fetch` to the URL stored in `process.env.API_ROUTE`:
+
+    ```typescript
+    const body = JSON.stringify({
+      query: print(LOGIN),
+      variables: { email: credentials.email },
+    })
+
+    const response = await fetch(`${process.env.API_ROUTE}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    })
+
+    const { data, errors } = await response.json()
+    ```
+
+    Note that only the **email** is sent to the server at this stage — the password is never transmitted.
+  </Step>
+
+  <Step title="Handle GraphQL errors">
+    If the response contains a GraphQL `errors` array, it is formatted using `formatGraphQLErrors` from `app/lib/logic.ts` and thrown as a plain `Error`:
+
+    ```typescript
+    if (errors) {
+      const formattedErrors = formatGraphQLErrors(errors)
+      throw new Error(`${formattedErrors}`)
+    }
+    ```
+  </Step>
+
+  <Step title="Compare the password">
+    The hashed password stored on the `userFound` object returned by GraphQL is compared against the plain-text password supplied by the user using `bcrypt.compare`:
+
+    ```typescript
+    const matchPassword = await bcrypt.compare(credentials.password, userFound.password)
+
+    if (!matchPassword) throw new Error('Contraseña incorrecta')
+    ```
+
+    If the passwords do not match, an error is thrown and NextAuth rejects the sign-in attempt.
+  </Step>
+
+  <Step title="Return the user object">
+    If all checks pass, the full `userFound` object is returned. NextAuth passes this value to the `jwt` callback as the `user` argument.
+  </Step>
+</Steps>
+
+---
+
+## Callbacks
+
+### JWT callback
+
+The `jwt` callback fires whenever a JWT is created or updated. It enriches the token with the user's `id` and `username` so those fields survive across requests:
+
+```typescript
+async jwt({ token, user }) {
+  if (user) {
+    return { ...token, id: user.id, username: user.username }
+  }
+  return token
+}
+```
+
+The `if (user)` guard ensures the fields are only written once — on the initial sign-in — and the existing token is returned unchanged on subsequent calls.
+
+### Session callback
+
+The `session` callback fires whenever `useSession()` or `getServerSession()` is called. It copies `id` and `username` from the token into the publicly accessible session object:
+
+```typescript
+async session({ session, token }) {
+  return {
+    ...session,
+    user: { ...session.user, id: token.id, username: token.username }
+  }
+}
+```
+
+This means any component that reads the session will have access to `session.user.id` and `session.user.username` alongside the standard `name` and `email` fields.
+
+---
+
+## Custom pages
+
+NextAuth is directed to use the application's own login page rather than its built-in UI:
+
+```typescript
+pages: {
+  signIn: '/login',
+}
+```
+
+Unauthenticated users who try to access a protected route will be redirected to `/login`.
+
+---
+
+## TypeScript type augmentation
+
+The project extends the default NextAuth types via a `next-auth.d.ts` declaration file, which adds the `id` and `username` fields to both the `Session` and `JWT` interfaces. This is required to avoid TypeScript errors when reading `session.user.id` or `token.username`, since those fields are not part of the NextAuth defaults.
+
+---
+
+## Accessing the session in components
+
+<CardGroup cols={2}>
+  <Card title="Client components" icon="browser">
+    Use the `useSession` hook from `next-auth/react`. The component must be wrapped in a `SessionProvider`.
+
+    ```typescript
+    'use client'
+    import { useSession } from 'next-auth/react'
+
+    const { data: session } = useSession()
+    console.log(session?.user?.username)
+    ```
+  </Card>
+  <Card title="Server components" icon="server">
+    Use `getServerSession` with the exported `authOptions` to avoid an extra network round-trip.
+
+    ```typescript
+    import { getServerSession } from 'next-auth'
+    import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+    const session = await getServerSession(authOptions)
+    console.log(session?.user?.id)
+    ```
+  </Card>
+</CardGroup>
+
+---
+
+## Route protection
+
+The Next.js middleware at `frontend/middleware.ts` protects the main authenticated area of the app by re-exporting the NextAuth middleware directly:
+
+```typescript
+export { default } from 'next-auth/middleware'
+
+export const config = {
+  matcher: ['/home/:path*'],
+}
+```
+
+Any request to a path that starts with `/home/` will be intercepted by NextAuth's middleware. Unauthenticated visitors are redirected to the `signIn` page (`/login`) automatically, without any additional code in individual page components.
+
+<Warning>
+  `NEXTAUTH_SECRET` must be set in all non-development environments. NextAuth will throw a runtime error and refuse to sign or verify tokens if the variable is absent when `NODE_ENV` is `production`. Generate a strong secret with `openssl rand -base64 32` and store it securely in your hosting provider's environment variable settings — never hardcode it in source files.
+</Warning>

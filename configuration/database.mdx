@@ -1,0 +1,110 @@
+---
+title: "Database Setup and Prisma Migrations"
+sidebarTitle: "Database"
+description: "How to set up MySQL, configure Prisma, run the initial migration, and understand the complete Plataforma Social database schema and cascade rules."
+---
+
+Plataforma Social persists all of its data — users, posts, comments, ratings, and follower relationships — in a MySQL database managed through Prisma ORM. The Prisma schema lives at `server/prisma/schema.prisma` and uses the `mysql` provider. Before starting the server for the first time you need a running MySQL instance, a dedicated database, and a successful migration run.
+
+## Requirements
+
+- **MySQL 8+** running locally (e.g. via Homebrew, Docker, or a native installer) or hosted remotely (e.g. PlanetScale, Railway, or AWS RDS).
+- **Node.js 18+** with the server dependencies installed (`npm install` inside `server/`).
+- A `DATABASE_URL` value configured in `server/.env` — see the [Environment Variables](/configuration/environment) page for the correct format.
+
+## Setup steps
+
+<Steps>
+  <Step title="Create the MySQL database">
+    Connect to your MySQL instance and create a dedicated database for the project. The name can be anything — `plataforma_social` is used throughout this guide.
+
+    ```sql
+    CREATE DATABASE plataforma_social;
+    ```
+  </Step>
+
+  <Step title="Set DATABASE_URL in server/.env">
+    Open (or create) `server/.env` and add your connection string, replacing the placeholder values with your actual MySQL credentials and host.
+
+    ```bash server/.env
+    DATABASE_URL="mysql://root:password@localhost:3306/plataforma_social"
+    ```
+  </Step>
+
+  <Step title="Generate the Prisma client">
+    From inside the `server/` directory, run the `generate` script to compile the Prisma client from your schema. You must re-run this step any time you modify `schema.prisma`.
+
+    ```bash
+    npm run generate
+    ```
+
+    This executes `npx prisma generate` and writes the typed client into `node_modules/@prisma/client`.
+  </Step>
+
+  <Step title="Run the initial migration">
+    Apply the initial migration to create all tables in your database:
+
+    ```bash
+    npm run migrate
+    ```
+
+    This runs `npx prisma migrate dev --name init`, which reads the SQL in `server/prisma/migrations/20240611205243_init/migration.sql`, applies it to the database, and records the migration in the `_prisma_migrations` table. On subsequent schema changes you can run the same command with a new `--name` value.
+  </Step>
+</Steps>
+
+## Available npm scripts
+
+All database-related commands (and the other server lifecycle scripts) are defined in `server/package.json`:
+
+| Script | Command | Purpose |
+|---|---|---|
+| `npm run generate` | `npx prisma generate` | Regenerates the Prisma client after schema changes |
+| `npm run migrate` | `npx prisma migrate dev --name init` | Applies pending migrations to the development database |
+| `npm run dev` | `nodemon` | Starts the dev server with hot-reload via `ts-node/esm` (config: `server/nodemon.json`) |
+| `npm run build` | `tsc` | Compiles TypeScript source to `dist/` |
+| `npm run start` | `npm run build && node dist/index.js` | Builds then starts the production server |
+
+## Database schema overview
+
+The schema defines eight models across `server/prisma/schema.prisma`. Every model uses a UUID primary key generated with `@default(uuid())`.
+
+| Model | Description |
+|---|---|
+| `User` | Platform account. Stores email (unique), username (unique), bcrypt-hashed password, optional bio, and avatar URL. |
+| `Setting` | One-to-one privacy and notification preferences per user. Controls profile visibility and in-app/email notification toggles. |
+| `Post` | A shared UI component entry authored by a `User`. Contains a title, description, and timestamps. |
+| `Comment` | A text comment left by a `User` on a `Post`. |
+| `Technology` | A named technology tag (e.g. "React", "Tailwind"). Names are globally unique. |
+| `Stack` | Join table linking a `Post` to one or more `Technology` entries. Composite primary key `(idPost, idTechnology)`. |
+| `Rating` | A numeric (`Float`) rating given by a `User` to a `Post`. |
+| `Follower` | Directed follow relationship between two `User` records. Composite primary key `(idFollower, idFollowing)`. |
+
+## Cascade behavior
+
+Most child records are configured with `onDelete: Cascade`, meaning they are automatically removed when their parent is deleted:
+
+- Deleting a **User** cascades to: `Setting`, `Post`, `Comment`, `Rating`.
+- Deleting a **Post** cascades to: `Comment`, `Stack`, `Rating`.
+- The `Stack` join table also cascades on `Technology` deletion.
+- **Follower** records use `RESTRICT` — a user with followers or following relationships cannot be deleted until those rows are removed first.
+
+<Note>
+  The exact foreign-key constraints are defined in the initial migration file at `server/prisma/migrations/20240611205243_init/migration.sql`. You can inspect that file to see the raw `ALTER TABLE … ADD CONSTRAINT` statements applied to MySQL.
+</Note>
+
+## Resetting the database
+
+If you need to start completely fresh — for example, to resolve a corrupted migration state — drop and recreate the database in MySQL, then run the migration again:
+
+```sql
+DROP DATABASE plataforma_social;
+CREATE DATABASE plataforma_social;
+```
+
+```bash
+npm run migrate
+```
+
+<Warning>
+  Dropping the database permanently deletes all data. Only do this in a local development environment. Never run these commands against a staging or production database.
+</Warning>

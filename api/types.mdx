@@ -1,0 +1,214 @@
+---
+title: "GraphQL Types: User, Setting, Post, and Responses"
+sidebarTitle: "Types"
+description: "Full reference for all GraphQL return types in the Plataforma Social API — User, Setting, UserWithSettings, and ResponseID — with field-level descriptions."
+---
+
+These are the GraphQL return types defined in the Apollo Server schema at `server/src/graphql/typeDefs.ts`. Every query and mutation in the Plataforma Social API returns one of these types or a list thereof. Understanding each type's fields and purpose is essential for building correct client queries and handling API responses.
+
+## User
+
+The `User` type represents a registered account. It is returned by `getUsers`, `getUser`, `postUser`, and `putUser`.
+
+<Warning>
+  The `password` field is included in the schema for use by the internal login flow (password verification). Avoid selecting the `password` field in client-facing queries — it contains the hashed credential value and should never be exposed to end users.
+</Warning>
+
+<ResponseField name="id" type="String">
+  The unique identifier of the user. A UUID generated automatically on account creation.
+</ResponseField>
+
+<ResponseField name="username" type="String">
+  The user's unique public-facing handle. Must be unique across all accounts.
+</ResponseField>
+
+<ResponseField name="email" type="String">
+  The user's email address. Must be unique across all accounts and is used as the login identifier.
+</ResponseField>
+
+<ResponseField name="password" type="String">
+  The user's hashed password. Stored as a bcrypt hash — never the plain-text value. For internal login use only; do not request this field in client queries.
+</ResponseField>
+
+<ResponseField name="description" type="String">
+  An optional bio or profile description provided by the user. Defaults to an empty string.
+</ResponseField>
+
+<ResponseField name="avatar" type="String">
+  A URL pointing to the user's profile picture. Defaults to an empty string when no avatar has been set.
+</ResponseField>
+
+---
+
+## Setting
+
+The `Setting` type holds all per-user privacy and notification preferences. It is a one-to-one companion to `User`, created automatically at registration with the defaults shown below.
+
+<ResponseField name="idSettings" type="String">
+  UUID primary key of the settings record.
+</ResponseField>
+
+<ResponseField name="idUser" type="String">
+  Foreign key referencing the owner's `User.id`. Unique — each user has exactly one settings row.
+</ResponseField>
+
+<ResponseField name="private" type="Boolean">
+  Controls account visibility. When `true`, the user's profile and posts are hidden from unauthenticated or non-following users. Defaults to `false`.
+</ResponseField>
+
+<ResponseField name="n_ratings" type="Boolean">
+  Enables in-app (desktop) push notifications when a user's post receives a new rating. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="n_comments" type="Boolean">
+  Enables in-app (desktop) push notifications when a user's post receives a new comment. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="n_followers" type="Boolean">
+  Enables in-app (desktop) push notifications when someone follows the user. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="n_populates" type="Boolean">
+  Enables in-app (desktop) push notifications for trending or popular content highlights. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="n_email_ratings" type="Boolean">
+  Enables email notifications when a user's post receives a new rating. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="n_email_comments" type="Boolean">
+  Enables email notifications when a user's post receives a new comment. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="n_email_followers" type="Boolean">
+  Enables email notifications when someone follows the user. Defaults to `true`.
+</ResponseField>
+
+---
+
+## UserWithSettings
+
+The `UserWithSettings` type extends the standard `User` type with an embedded `Setting` object. It carries the full user profile together with their notification and privacy preferences in a single response.
+
+<Note>
+  This type is **only returned by the `login` query**. All other user-returning operations (`getUser`, `getUsers`, etc.) return the plain `User` type without the nested `Setting`.
+</Note>
+
+<ResponseField name="id" type="String">
+  UUID of the authenticated user.
+</ResponseField>
+
+<ResponseField name="username" type="String">
+  The user's unique public handle.
+</ResponseField>
+
+<ResponseField name="email" type="String">
+  The user's email address.
+</ResponseField>
+
+<ResponseField name="password" type="String">
+  The user's hashed password. Present for internal session validation; do not expose to clients.
+</ResponseField>
+
+<ResponseField name="description" type="String">
+  The user's optional profile bio. Defaults to an empty string.
+</ResponseField>
+
+<ResponseField name="avatar" type="String">
+  URL for the user's profile picture. Defaults to an empty string.
+</ResponseField>
+
+<ResponseField name="Setting" type="Setting">
+  The user's full notification and privacy settings record, returned inline at login so the client can initialise UI state without a second round-trip.
+
+  <Expandable title="Setting fields">
+    <ResponseField name="idSettings" type="String">
+      UUID primary key of the settings row.
+    </ResponseField>
+    <ResponseField name="idUser" type="String">
+      Foreign key back to the owning `User.id`.
+    </ResponseField>
+    <ResponseField name="private" type="Boolean">
+      Account visibility flag. `true` means the profile is private.
+    </ResponseField>
+    <ResponseField name="n_ratings" type="Boolean">
+      Desktop notification toggle for new ratings.
+    </ResponseField>
+    <ResponseField name="n_comments" type="Boolean">
+      Desktop notification toggle for new comments.
+    </ResponseField>
+    <ResponseField name="n_followers" type="Boolean">
+      Desktop notification toggle for new followers.
+    </ResponseField>
+    <ResponseField name="n_populates" type="Boolean">
+      Desktop notification toggle for trending content.
+    </ResponseField>
+    <ResponseField name="n_email_ratings" type="Boolean">
+      Email notification toggle for new ratings.
+    </ResponseField>
+    <ResponseField name="n_email_comments" type="Boolean">
+      Email notification toggle for new comments.
+    </ResponseField>
+    <ResponseField name="n_email_followers" type="Boolean">
+      Email notification toggle for new followers.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## ResponseID
+
+The `ResponseID` type is a minimal confirmation envelope returned by destructive mutations that do not need to return the full updated resource.
+
+<Note>
+  This type is currently returned by the `deleteUser` mutation to confirm which user account was removed.
+</Note>
+
+<ResponseField name="id" type="String">
+  The UUID of the affected resource — in the case of `deleteUser`, this is the `User.id` that was permanently deleted.
+</ResponseField>
+
+---
+
+## Full GraphQL SDL
+
+The complete type definitions as declared in `server/src/graphql/typeDefs.ts`:
+
+```graphql
+type User {
+  id: String
+  username: String
+  email: String
+  password: String
+  description: String
+  avatar: String
+}
+
+type Setting {
+  idSettings: String
+  idUser: String
+  private: Boolean
+  n_ratings: Boolean
+  n_comments: Boolean
+  n_followers: Boolean
+  n_populates: Boolean
+  n_email_ratings: Boolean
+  n_email_comments: Boolean
+  n_email_followers: Boolean
+}
+
+type UserWithSettings {
+  id: String
+  username: String
+  email: String
+  password: String
+  description: String
+  avatar: String
+  Setting: Setting
+}
+
+type ResponseID {
+  id: String
+}
+```

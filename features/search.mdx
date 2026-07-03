@@ -1,0 +1,159 @@
+---
+title: "Search and Filter Open Source Components"
+sidebarTitle: "Search"
+description: "The search page at /home/search supports text queries and technology filters via URL query parameters, with a toggleable sidebar filter panel and CardPost results."
+---
+
+The search page at `/home/search` is the primary discovery surface on Plataforma Social. It renders the same `CardPost` grid as the main feed but layers on a text search bar and a collapsible filter sidebar so users can narrow results by technology, category, and rating. All search state lives in the URL — queries and filters are encoded as query parameters, making every search result shareable and bookmarkable with a direct link.
+
+## URL-Based Search
+
+Both the home feed (`/home`) and the search page (`/home/search`) share the same navigation pattern: the user types into an `InputWithIcon` field and submits to push a `?query=` parameter onto `/home/search`.
+
+```typescript
+// frontend/app/home/search/page.tsx
+function Search() {
+  const [searchText, setSearchText] = useState('')
+  const router = useRouter();
+
+  const handleSubmit = () => {
+    router.push(`/home/search?query=${encodeURIComponent(searchText)}`);
+  }
+
+  return (
+    <>
+      <section className='flex flex-col items-center w-full gap-5'>
+        <InputWithIcon
+          type='text'
+          placeholder='Buscar'
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          endContent={<SearchIcon className='size-5' />}
+          onSubmit={handleSubmit}
+        />
+        <CardPost/>
+        <CardPost/>
+        <CardPost/>
+        <CardPost/>
+      </section>
+      {/* sidebar — see below */}
+    </>
+  )
+}
+```
+
+The `encodeURIComponent` call ensures that spaces and special characters in the search text are safely encoded as URL components (e.g., `"Button React"` becomes `Button%20React`).
+
+## Technology Filter via CardPost Tags
+
+Every `CardPost` card displays its tech-stack tags as clickable pill buttons. Each tag is a `<Link>` that navigates directly to `/home/search?tech=<technology>`, bypassing the search bar entirely:
+
+```typescript
+// frontend/app/components/ui/CardPost.tsx
+<Link href={'/home/search?tech=tecnologia'}>
+  <Button
+    variant='flat'
+    color='secondary'
+    shape='full'
+    size='sm'
+    marginX='none'
+    className='px-3 py-0.5'
+  >
+    Tecnologia
+  </Button>
+</Link>
+```
+
+This means a user who spots an interesting React component can click its **React** tag to see all React components on the platform without typing anything in the search bar.
+
+## Filter Sidebar
+
+The search page has a fixed right-side panel (`right-0`, full screen height) that contains a **Filtrar** button at the top and a **Crear** button at the bottom.
+
+### Toggling the Filter Panel
+
+The **Filtrar** button toggles `isFilterActive` state. When active, the panel expands to `w-[250px]` with a `bg-seagreen-900` background and reveals the filter controls. The button color also switches from `primary` to `secondary` to reflect the active state:
+
+```typescript
+// frontend/app/home/search/page.tsx
+const [isFilterActive, setIsFilterActive] = useState(false)
+
+const handleFilterState = () => {
+  setIsFilterActive(!isFilterActive)
+}
+
+<Button
+  className='px-3'
+  color={`${isFilterActive ? 'secondary' : 'primary'}`}
+  startContent={<PlusIcon />}
+  onClick={handleFilterState}
+>
+  Filtrar
+</Button>
+
+<div className={`${isFilterActive
+  ? 'w-[250px] h-full flex flex-col items-center bg-seagreen-900 rounded-l-xl text-white p-3 gap-5'
+  : ''
+}`}>
+  {isFilterActive && (
+    <>
+      <p className="text-lg font-medium">Tecnologias</p>
+      <select name="tech" id="tech" defaultValue={'default'}
+        className="bg-storm-50 px-3 py-1 rounded-lg ring-1 ring-seagreen-950 text-seagreen-950 outline-none w-full">
+        <option value="default" disabled>-- Selecione --</option>
+        <option value="React">React</option>
+      </select>
+      <p className="text-lg font-medium">Categorias</p>
+      <p className="text-lg font-medium">Clasificacion</p>
+    </>
+  )}
+</div>
+```
+
+### Filter Panel Contents
+
+When the panel is open, three filter sections are displayed:
+
+| Section label | Control | Notes |
+|---|---|---|
+| **Tecnologias** | `<select>` dropdown | Options include `React` (and others); defaults to `-- Selecione --` |
+| **Categorias** | Label only | Category filter UI (in development) |
+| **Clasificacion** | Label only | Rating filter UI (in development) |
+
+<Info>
+  Filter selections and text queries work together — the `?query=` and `?tech=` parameters can both be present in the URL simultaneously. GraphQL queries on the backend receive both values and apply them as compound filters.
+</Info>
+
+## Navigation Patterns Summary
+
+Here is a quick reference for all URL-driven navigation patterns used across the search feature:
+
+```typescript
+// Text search — from the InputWithIcon bar on /home or /home/search
+router.push(`/home/search?query=${encodeURIComponent(searchText)}`)
+
+// Technology filter — from a CardPost tech tag
+<Link href={'/home/search?tech=tecnologia'}>
+  <Button>Tecnologia</Button>
+</Link>
+
+// Technology filter — from the sidebar select dropdown
+// Selecting "React" navigates to: /home/search?tech=React
+```
+
+## Additional Feed Views
+
+Beyond the main feed and search results, the Navbar links to two more curated feeds:
+
+<CardGroup cols={2}>
+  <Card title="Populares — /home/trending" icon="fire">
+    Accessible from the **Populares** Navbar link (`TrendingIcon`). Shows components ranked by engagement — a discovery surface for the highest-rated or most-commented posts on the platform.
+  </Card>
+  <Card title="Siguiendo — /home/followers" icon="users">
+    Accessible from the **Siguiendo** Navbar link (`UserCheck` icon). Shows only posts from users you follow, creating a personalized feed of trusted contributors.
+  </Card>
+</CardGroup>
+
+<Note>
+  All three feeds — `/home`, `/home/trending`, and `/home/followers` — render `CardPost` components and share the same interaction patterns (follow, rate, comment, share, bookmark). The only difference is the GraphQL query used to fetch and sort the posts.
+</Note>

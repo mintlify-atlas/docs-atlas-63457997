@@ -1,0 +1,73 @@
+---
+title: "Plataforma Social: Build and Share UI Components"
+sidebarTitle: "Introduction"
+description: "Plataforma Social is an open-source social platform for developers to publish, discover, and rate reusable UI components built with modern web technologies."
+---
+
+Plataforma Social is a community-driven web application where developers can share reusable open-source UI components, follow other creators, and discover new building blocks for their next project. This page introduces what the platform is, the problem it solves, and the technologies that power it.
+
+## The Problem It Solves
+
+Finding high-quality, reusable UI components often means bouncing between GitHub repositories, CodePen pens, and scattered blog posts with no consistent way to rate, comment on, or discuss them. Plataforma Social brings all of that into a single, purpose-built social feed — letting developers publish component posts, tag them by technology stack, receive star ratings from peers, and build a public profile around their open-source work.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Social Feed"
+    icon="newspaper"
+    href="/features/components-feed"
+  >
+    Browse a real-time feed of community-submitted UI components, filtered by technology stack or sorted by rating.
+  </Card>
+  <Card
+    title="Authentication"
+    icon="lock"
+    href="/features/authentication"
+  >
+    Secure credential-based sign-up and sign-in powered by NextAuth, with bcrypt password hashing on the server.
+  </Card>
+  <Card
+    title="User Profiles"
+    icon="circle-user"
+    href="/features/profiles"
+  >
+    Each developer gets a public profile with their avatar, bio, posts, follower count, and customizable notification settings.
+  </Card>
+  <Card
+    title="Search & Filter"
+    icon="magnifying-glass"
+    href="/features/search"
+  >
+    Find components by title, description, or technology tag. Filter the feed to surface exactly what you need.
+  </Card>
+  <Card
+    title="GraphQL API"
+    icon="code"
+    href="/api/overview"
+  >
+    A fully typed GraphQL API built with Apollo Server 4 exposes every resource — users, posts, comments, ratings, and more.
+  </Card>
+  <Card
+    title="UI Component Library"
+    icon="palette"
+    href="/frontend/button"
+  >
+    The frontend ships with its own set of reusable Tailwind-styled components you can explore and adapt for your projects.
+  </Card>
+</CardGroup>
+
+## Technology Overview
+
+Plataforma Social is built on a modern, production-ready stack spanning both a dedicated backend API service and a Next.js frontend:
+
+- **Next.js 14** — App Router, React Server Components, and SSR for a fast, SEO-friendly frontend
+- **Apollo Server 4** — Schema-first GraphQL server mounted on Express via `expressMiddleware`
+- **Prisma ORM** — Type-safe database access with auto-generated migrations targeting MySQL
+- **MySQL** — Relational database storing users, posts, comments, ratings, followers, and settings
+- **NextAuth v4** — Session management and credentials-based authentication on the frontend
+- **Tailwind CSS** — Utility-first styling with a custom color palette (`storm` and `seagreen` scales)
+
+<Note>
+  Ready to run the project locally? Head to the [Quickstart](/quickstart) guide for step-by-step setup instructions for both the server and the frontend.
+</Note>

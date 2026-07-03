@@ -1,0 +1,226 @@
+---
+title: "GraphQL Queries: Fetch Users and Login"
+sidebarTitle: "Queries"
+description: "Reference for all three GraphQL queries: getUsers returns all users, getUser fetches one by ID, and login retrieves a user with settings for NextAuth."
+---
+
+The Plataforma Social API exposes three read queries. `getUsers` and `getUser` are general-purpose queries for fetching user data; `login` is a specialized query used exclusively by the NextAuth credentials provider to verify credentials during sign-in. All queries are sent as `POST` requests to `/graphql` — see the [API Overview](/api/overview) for request formatting details.
+
+---
+
+## getUsers
+
+```graphql
+getUsers: [User]
+```
+
+Returns an array of all registered users in the database. The array will be empty (`[]`) when no users exist. No arguments are required.
+
+**Return type:** `[User]`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `String` | UUID of the user |
+| `username` | `String` | Unique display name |
+| `email` | `String` | Email address |
+| `description` | `String` | Optional profile bio |
+| `avatar` | `String` | URL of the profile image |
+
+### Example
+
+```graphql
+query {
+  getUsers {
+    id
+    username
+    email
+    description
+    avatar
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "getUsers": [
+      {
+        "id": "uuid-here",
+        "username": "johndoe",
+        "email": "john@example.com",
+        "description": "Frontend developer",
+        "avatar": "https://example.com/avatar.jpg"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## getUser
+
+```graphql
+getUser(id: String!): User
+```
+
+Fetches a single user by their UUID. Use this query whenever you need the full profile of a specific user.
+
+**Parameters:**
+
+<ParamField query="id" type="String" required>
+  The UUID of the user to retrieve. This value is the `id` field returned by `getUsers`, `postUser`, or any other operation that returns a `User`.
+</ParamField>
+
+**Return type:** `User`
+
+**Errors:**
+
+| Code | Condition |
+|------|-----------|
+| `NOT_FOUND` (404) | No user exists with the provided `id` |
+
+### Example
+
+```graphql
+query GetUser($id: String!) {
+  getUser(id: $id) {
+    id
+    username
+    email
+    description
+    avatar
+  }
+}
+```
+
+**Variables:**
+
+```json
+{
+  "id": "uuid-here"
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "getUser": {
+      "id": "uuid-here",
+      "username": "johndoe",
+      "email": "john@example.com",
+      "description": "Frontend developer",
+      "avatar": "https://example.com/avatar.jpg"
+    }
+  }
+}
+```
+
+---
+
+## login
+
+```graphql
+login(email: String!): UserWithSettings
+```
+
+Looks up a user by email address and returns their full profile together with their associated `Setting` record. This query is designed to be called from the **NextAuth credentials provider** `authorize` callback. It deliberately returns the hashed `password` field so that NextAuth can verify the supplied plain-text password with bcrypt.
+
+<Note>
+  This query is intended for server-side use inside NextAuth's `authorize` function only. Never request the `password` field from client-side components or expose it in a client-facing query.
+</Note>
+
+**Parameters:**
+
+<ParamField query="email" type="String" required>
+  The email address of the user attempting to sign in. Looked up with an exact, case-sensitive match.
+</ParamField>
+
+**Return type:** `UserWithSettings`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `String` | UUID of the user |
+| `username` | `String` | Unique display name |
+| `email` | `String` | Email address |
+| `password` | `String` | bcrypt-hashed password — for server-side verification only |
+| `description` | `String` | Optional profile bio |
+| `avatar` | `String` | URL of the profile image |
+| `Setting` | `Setting` | The user's notification and privacy settings |
+
+**`Setting` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `idSettings` | `String` | UUID of the settings record |
+| `idUser` | `String` | UUID of the owning user |
+| `private` | `Boolean` | Whether the profile is private |
+| `n_ratings` | `Boolean` | In-app notifications for ratings |
+| `n_comments` | `Boolean` | In-app notifications for comments |
+| `n_followers` | `Boolean` | In-app notifications for new followers |
+| `n_populates` | `Boolean` | In-app notifications for populates |
+| `n_email_ratings` | `Boolean` | Email notifications for ratings |
+| `n_email_comments` | `Boolean` | Email notifications for comments |
+| `n_email_followers` | `Boolean` | Email notifications for new followers |
+
+**Errors:**
+
+| Code | Condition |
+|------|-----------|
+| `NOT_FOUND` (404) | No user exists with the provided `email` |
+
+### Example
+
+```graphql
+query Login($email: String!) {
+  login(email: $email) {
+    id
+    username
+    email
+    password
+    description
+    avatar
+    Setting {
+      idSettings
+      private
+      n_ratings
+      n_comments
+    }
+  }
+}
+```
+
+**Variables:**
+
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "login": {
+      "id": "uuid-here",
+      "username": "johndoe",
+      "email": "john@example.com",
+      "password": "$2b$10$hashedpasswordstring",
+      "description": "Frontend developer",
+      "avatar": "https://example.com/avatar.jpg",
+      "Setting": {
+        "idSettings": "settings-uuid",
+        "private": false,
+        "n_ratings": true,
+        "n_comments": true
+      }
+    }
+  }
+}
+```

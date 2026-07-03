@@ -1,0 +1,68 @@
+---
+title: "Configure Environment Variables for Plataforma Social"
+sidebarTitle: "Environment Variables"
+description: "A complete reference for all required and optional environment variables used by the Plataforma Social server and Next.js frontend."
+---
+
+Plataforma Social is split into two independent applications — the Express + Apollo Server backend and the Next.js 14 frontend — and each one reads its own set of environment variables from a separate file. The server reads from `server/.env` and the frontend reads from `frontend/.env.local`. Neither file is committed to version control, so you must create both locally before starting the project.
+
+## Server environment variables
+
+The server application (`server/.env`) requires a database connection string and accepts an optional port override. These values are consumed at startup by Prisma and Express respectively.
+
+<ParamField path="DATABASE_URL" type="string" required>
+  MySQL connection string used by Prisma to connect to your database. Follow the format `mysql://USER:PASSWORD@HOST:PORT/DATABASE`, replacing each segment with your actual credentials and host details.
+</ParamField>
+
+<ParamField path="PORT" type="number">
+  HTTP port on which the Express server listens. Defaults to `4005` when not set — this is defined in `server/src/index.ts` as `const PORT = process.env.PORT || 4005`. Override this only if port `4005` is already in use on your machine.
+</ParamField>
+
+## Frontend environment variables
+
+The Next.js frontend (`frontend/.env.local`) needs three variables: a secret for signing JWT session tokens, the canonical URL of the app itself, and the URL of the GraphQL API that NextAuth calls during authentication.
+
+<ParamField path="NEXTAUTH_SECRET" type="string" required>
+  A random secret string used by NextAuth.js to sign and verify JWT session tokens. Must be set in every environment — NextAuth will throw an error and refuse to start in production if this value is missing.
+</ParamField>
+
+<ParamField path="NEXTAUTH_URL" type="string" required>
+  The canonical base URL of your Next.js application. NextAuth uses this to build callback URLs and redirects. Set it to `http://localhost:3000` for local development and to your deployed domain in production (e.g. `https://plataforma-social.example.com`).
+</ParamField>
+
+<ParamField path="API_ROUTE" type="string" required>
+  The full URL of the GraphQL endpoint exposed by the backend server. This is read directly inside the NextAuth `authorize` function (`frontend/app/api/auth/[...nextauth]/route.ts`) when it calls `fetch` to log a user in. Set it to `http://localhost:4005/graphql` for local development.
+</ParamField>
+
+## Example environment files
+
+Copy these templates into the respective directories and fill in your own values before starting either application.
+
+```bash server/.env
+DATABASE_URL="mysql://root:password@localhost:3306/plataforma_social"
+PORT=4005
+```
+
+```bash frontend/.env.local
+NEXTAUTH_SECRET="your-random-secret-here"
+NEXTAUTH_URL="http://localhost:3000"
+API_ROUTE="http://localhost:4005/graphql"
+```
+
+<Warning>
+  Never commit `.env` or `.env.local` files to version control. Both the `server/` and `frontend/` directories should have `.gitignore` entries covering these files. Exposing `DATABASE_URL` or `NEXTAUTH_SECRET` in a public repository is a serious security risk.
+</Warning>
+
+<Note>
+  The Apollo Client defined in `frontend/app/lib/client.ts` currently hardcodes `http://localhost:4000/graphql` as the GraphQL URI used for server-component data fetching. If your backend runs on a different port (the default is `4005`), you must update that `uri` value in `client.ts` to match — `API_ROUTE` in `.env.local` only affects NextAuth authentication calls, not the Apollo Client.
+</Note>
+
+<Tip>
+  Generate a strong `NEXTAUTH_SECRET` with a single terminal command:
+
+  ```bash
+  openssl rand -base64 32
+  ```
+
+  Paste the output directly into your `frontend/.env.local` file. Run this command once per environment (local, staging, production) and keep each secret unique.
+</Tip>

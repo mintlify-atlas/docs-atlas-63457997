@@ -1,0 +1,102 @@
+---
+title: "Input and InputWithIcon Components"
+sidebarTitle: "Input"
+description: "Styled Input and InputWithIcon components with Tailwind ring borders, dark mode support, and an icon button slot with submit callback."
+---
+
+The `Input` component is a styled wrapper around the native HTML `<input>` element that applies the project's consistent ring border, background, and typography tokens. `InputWithIcon` extends it with an icon button anchored in the trailing position and an `onSubmit` callback, making it suitable for search bars and inline comment fields. Both components use `clsx` and `tailwind-merge` for class composition, and both fully support dark mode via Tailwind's `class` strategy.
+
+## Input
+
+```tsx
+import Input from "@/components/ui/Input"
+```
+
+`Input` accepts the full set of `React.InputHTMLAttributes<HTMLInputElement>` props — `type`, `name`, `id`, `value`, `onChange`, `placeholder`, `disabled`, `autoComplete`, and all other standard attributes — forwarded directly to the underlying `<input>` element. An optional `className` prop is merged on top of the base styles via `twMerge`, so you can extend or override individual Tailwind classes without duplication.
+
+### Base styles
+
+The following Tailwind classes are applied by default and can be overridden via `className`:
+
+| Token          | Light mode                | Dark mode                |
+| -------------- | ------------------------- | ------------------------ |
+| Border         | `ring-1 ring-seagreen-950` | `dark:ring-white`       |
+| Background     | `bg-storm-50`             | `dark:bg-storm-900`      |
+| Text           | `text-seagreen-950`       | `dark:text-white`        |
+| Placeholder    | `placeholder:font-medium` | `dark:placeholder:text-white/50` |
+| Shape          | `rounded-lg`              | —                        |
+| Spacing        | `py-1 px-3`               | —                        |
+| Outline        | `outline-none`            | —                        |
+
+### Usage
+
+```tsx
+<Input
+  type="email"
+  placeholder="correo@gmail.com"
+  id="email"
+  name="email"
+  value={formState.email}
+  onChange={e => handleChange(e)}
+/>
+```
+
+---
+
+## InputWithIcon
+
+```tsx
+import InputWithIcon from "@/components/ui/InputWithIcon"
+```
+
+`InputWithIcon` composes the same input styles into a pill-shaped container (`rounded-full`) that holds the `<input>` on the left and an icon button on the right, separated by a 1px vertical divider. The container is capped at `max-w-[400px]` and stretches to `w-full` within that limit.
+
+The inner `<input>` uses `bg-inherit` so it blends into the container background rather than applying its own fill.
+
+### Additional props
+
+<ParamField path="endContent" type="ReactNode" required>
+  The icon or element displayed in the trailing button slot. Clicking the button or pressing Enter triggers `onSubmit`. A common pattern is passing a `SearchIcon` or `MessagePlusIcon` here.
+</ParamField>
+
+<ParamField path="onSubmit" type="() => void" required>
+  Called when the user clicks the trailing icon button. Wire this to your search handler or comment submission function. Keyboard-based submission (Enter key) should be handled separately via the `onKeyDown` prop passed through `...rest`.
+</ParamField>
+
+<ParamField path="...rest" type="React.InputHTMLAttributes<HTMLInputElement>">
+  All standard input attributes — `type`, `value`, `onChange`, `placeholder`, `disabled`, etc. — forwarded to the inner `<input>` element. An optional `className` is also accepted and merged onto the inner input's class list.
+</ParamField>
+
+### Usage in search bar
+
+```tsx
+<InputWithIcon
+  type="text"
+  placeholder="Buscar"
+  value={searchText}
+  onChange={e => setSearchText(e.target.value)}
+  endContent={<SearchIcon className="size-5" />}
+  onSubmit={handleSubmit}
+/>
+```
+
+### Usage in comment input
+
+```tsx
+<InputWithIcon
+  type="text"
+  placeholder="Deja tu comentario aqui"
+  endContent={<MessagePlusIcon />}
+  onSubmit={() => {}}
+/>
+```
+
+---
+
+## Dark Mode
+
+Both components follow the `darkMode: 'class'` configuration in `tailwind.config.ts`. The `dark` class is toggled on the `<html>` element at runtime — no additional configuration is needed inside the components themselves.
+
+<Note>
+  `InputWithIcon` applies its dark mode tokens (`dark:bg-storm-900`, `dark:ring-white`, `dark:text-white`) on the outer container `<div>` rather than the inner `<input>`. This ensures the pill border and background switch together as a unit.
+</Note>

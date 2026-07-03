@@ -1,0 +1,130 @@
+---
+title: "Next.js App Router Pages and Route Structure"
+sidebarTitle: "Pages"
+description: "A complete reference for all App Router pages in Plataforma Social — their routes, layouts, protection status, and what each page renders."
+---
+
+Plataforma Social uses the **Next.js 14 App Router**. Pages are organized under the `app/` directory with nested layouts that provide shared structure for sections of the application. Authentication is enforced at the routing layer by Next.js middleware, ensuring protected pages are never reachable without a valid session.
+
+---
+
+## Layouts
+
+### Root layout — `app/layout.tsx`
+
+The root layout wraps every page in the application. It sets the base HTML document metadata (title: **"UVM Dev House"**), loads the **Barlow** Google Font, and provides two global context providers:
+
+1. **`SessionWrapper`** — a thin `"use client"` wrapper around NextAuth's `SessionProvider`, which makes the session available to all client components via `useSession()`.
+2. **`ApolloWrapper`** — wraps children with `ApolloNextAppProvider` so every page and component can query the GraphQL API through Apollo Client.
+
+```tsx
+// app/layout.tsx (conceptual structure)
+<SessionWrapper>
+  <ApolloWrapper>
+    {children}
+  </ApolloWrapper>
+</SessionWrapper>
+```
+
+<Info>
+  `SessionWrapper` is the outermost provider so the session is available to `ApolloWrapper` and all descendants. Both providers are `"use client"` components, but the layout file itself is a Server Component.
+</Info>
+
+The `body` element applies global Tailwind classes for light/dark theming: `bg-storm-50 text-seagreen-950` in light mode and `dark:bg-storm-950 dark:text-white` in dark mode.
+
+### Home layout — `app/home/layout.tsx`
+
+All routes nested under `/home/*` inherit this layout. It renders the **`Navbar`** component inside a fixed-width `<aside>` (width `w-52`), then places `{children}` in a full-width `<main>` column. It also mounts a `<Toaster />` from `react-hot-toast` for in-app toast notifications.
+
+```tsx
+// app/home/layout.tsx (conceptual structure)
+<SessionProvider>          {/* app/lib/SessionProvider.tsx */}
+  <div className="flex">
+    <aside className="w-52">
+      <Navbar />
+    </aside>
+    <main>
+      {children}
+    </main>
+    <Toaster />
+  </div>
+</SessionProvider>
+```
+
+<Note>
+  The `SessionProvider` used here (`app/lib/SessionProvider.tsx`) is a **custom client component** — distinct from the NextAuth `SessionProvider` used in the root layout. It calls `useSession()` and immediately redirects to `/login` if there is no active session, acting as a client-side guard in addition to the middleware check.
+</Note>
+
+---
+
+## Route Reference
+
+### Public routes
+
+| Route | File | Description |
+|---|---|---|
+| `/` | `app/page.tsx` | Root landing page. Currently renders a minimal placeholder. |
+| `/login` | `app/login/page.tsx` | Login page. Renders the **`FormLogin`** component alongside the UVM Dev House branding headline. |
+| `/register` | `app/register/page.tsx` | Registration page. Renders the **`FormRegister`** component. On successful registration, redirects to `/login`. |
+
+### Protected routes (require authentication)
+
+All routes below are under the `/home/:path*` middleware matcher and require a valid NextAuth session.
+
+| Route | File | Description |
+|---|---|---|
+| `/home` | `app/home/page.tsx` | Main "Para ti" feed. Displays a list of **`CardPost`** components, a search bar (`InputWithIcon`), and a fixed floating **"Crear"** button (`PlusIcon`) in the bottom-right corner. Submitting the search bar navigates to `/home/search?query=…`. |
+| `/home/search` | `app/home/search/page.tsx` | Search results page. Includes the same search bar, a list of `CardPost` results, and a collapsible right-side filter panel with a **Tecnologias** dropdown and **Categorias / Clasificacion** sections. A separate **"Crear"** floating button is also present. |
+| `/home/post` | `app/home/post/page.tsx` | Component post detail view. Shows the post title, description, author info, publication date, tech-stack tags, star rating, action buttons (Share, Edit, Delete), a syntax-highlighted code block with a **"Descargar archivo"** button, and a fixed 300 px right-side **Comentarios** sidebar with an input field. |
+| `/home/my-profile` | `app/home/my-profile/page.tsx` | Current user's profile page. Fetches user data via the `GET_USER` GraphQL query (using `session.user.id`). Renders `InfoProfile`, `Badge`, and a list of the user's `CardPost` components. An **"Editar perfil"** modal (`EditProfile`) overlays the page when activated. |
+| `/home/my-profile/settings` | `app/home/my-profile/settings/page.tsx` | Account settings page. The Navbar is **hidden** on this route, giving the layout full width. Contains a two-column layout: a left sidebar with anchor links (Administrar cuenta, Privacidad, Notificaciones) and a main panel with account controls (delete account, change password), privacy toggles (private account), and notification preferences (desktop + email) using `SwitchButton` components. |
+| `/home/followers` | *(linked from Navbar)* | Following feed. Shows posts from users the current user follows. Linked from the **Siguiendo** (`UserCheck` icon) nav item. |
+| `/home/trending` | *(linked from Navbar)* | Trending / popular components feed. Linked from the **Populares** (`TrendingIcon`) nav item. |
+| `/home/profile/:id` | *(linked from CardPost)* | Another user's public profile. Navigated to by clicking an author's name on a `CardPost` card. |
+
+### API routes
+
+| Route | Description |
+|---|---|
+| `/api/auth/[...nextauth]` | NextAuth catch-all API route. Handles `GET` and `POST` requests for sign-in, sign-out, session management, and OAuth callbacks. |
+
+---
+
+## Authentication & Route Protection
+
+Routes under `/home/*` are protected at two layers:
+
+1. **Middleware** (edge layer) — `middleware.ts` re-exports the NextAuth middleware and applies it to every path matching `/home/:path*`. Unauthenticated requests are redirected before the page ever renders.
+2. **Client-side guard** — `app/lib/SessionProvider.tsx` wraps the home layout. It watches the session status with `useSession()` and calls `redirect('/login')` inside a `useEffect` if no session is present, catching any edge cases the middleware may not cover.
+
+```typescript
+// middleware.ts
+export { default } from 'next-auth/middleware'
+
+export const config = {
+  matcher: ["/home/:path*"]
+}
+```
+
+<Tip>
+  The `/login` and `/register` pages are purely public — they do not check for an existing session at the page level, so a logged-in user who navigates to `/login` manually will not be automatically redirected. Handle that in `FormLogin` if you want to prevent unnecessary visits.
+</Tip>
+
+---
+
+## Provider Wrapping
+
+The provider nesting order in the root layout matters. `SessionWrapper` must sit outside `ApolloWrapper` so that the session token is accessible when Apollo Client makes authenticated GraphQL requests.
+
+```tsx
+// app/layout.tsx (conceptual structure)
+<ApolloWrapper>
+  <SessionProvider>
+    {children}
+  </SessionProvider>
+</ApolloWrapper>
+```
+
+<Note>
+  `ApolloWrapper` uses `ApolloNextAppProvider` from `@apollo/experimental-nextjs-app-support`, which creates separate Apollo Client instances for SSR and the browser. On the server (`typeof window === "undefined"`), it chains `SSRMultipartLink` (with `stripDefer: true`) before the `HttpLink` so deferred queries are fully resolved during server rendering. On the client, only the `HttpLink` is used. All requests target `http://localhost:4000/graphql` with `cache: "no-store"` to avoid stale data.
+</Note>

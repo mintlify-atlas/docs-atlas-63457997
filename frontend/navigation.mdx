@@ -1,0 +1,173 @@
+---
+title: "Navbar Component: Navigation and Dark Mode"
+sidebarTitle: "Navigation"
+description: "How the Navbar component works — its navigation links, collapsible notification panel, user menu, logout flow, and class-based dark mode toggle."
+---
+
+The **Navbar** is a fixed left-sidebar navigation component rendered inside `app/home/layout.tsx`. It provides primary navigation links, a collapsible notification panel, a user menu ("Mas") with secondary actions, and a dark mode toggle. Every `/home/*` page (except `/home/my-profile/settings`) displays the Navbar on the left edge of the viewport.
+
+---
+
+## Rendering Context
+
+The Navbar is mounted once inside the home layout's `<aside>` element:
+
+```tsx
+// app/home/layout.tsx
+<aside className="w-52">
+  <Navbar />
+</aside>
+```
+
+Because the Navbar is a `"use client"` component, it has full access to React state, browser events, and Next.js client-side hooks (`usePathname`, `useRouter`).
+
+<Note>
+  The Navbar is **hidden** on the `/home/my-profile/settings` route. This is implemented directly in the component: when `pathname === '/home/my-profile/settings'` the outermost `<section>` receives the `hidden` Tailwind class, giving the settings page full horizontal space.
+</Note>
+
+---
+
+## Navigation Links
+
+The primary `<nav>` lists six items. Each link is a Next.js `<Link>` wrapping a `<Button>` component. The active link is highlighted with `bg-lima-400/30 dark:bg-biscay-950` background classes. The current pathname is detected with `usePathname()` from `next/navigation`.
+
+| Label | Icon | Route | Description |
+|---|---|---|---|
+| Para ti | `HomeIcon` | `/home` | Main "for you" feed — all public posts. |
+| Siguiendo | `UserCheck` | `/home/followers` | Posts from users the current user follows. |
+| Populares | `TrendingIcon` | `/home/trending` | Trending / most-popular components. |
+| Buscar | `SearchIcon` | `/home/search` | Search results page with filter panel. |
+| Notificaciones | `BellIcon` | *(no href — toggles panel)* | Toggles the notifications side panel. |
+| Perfil | `UserIcon` | `/home/my-profile` | Current user's profile page. |
+
+Active link classes applied when the current `pathname` matches the link's route:
+
+```tsx
+// Active state classes (applied to the Button className)
+"bg-lima-400/30 dark:bg-biscay-950 hover:bg-lima-400/50 dark:hover:bg-biscay-900"
+
+// Inactive hover classes
+"hover:bg-lima-400/30 dark:hover:bg-biscay-900"
+```
+
+---
+
+## Collapse Behavior (Notification Panel Open)
+
+When the notification panel is open (`notifyOpen === true`), the Navbar collapses to **icon-only mode**. Every link button shrinks from `w-full` to `w-auto h-11`, and all text labels are hidden using a conditional expression directly in JSX:
+
+```tsx
+{!notifyOpen && "Para ti"}
+{!notifyOpen && "Siguiendo"}
+{!notifyOpen && "Notificaciones"}
+// … and so on for every label
+```
+
+The `widthCondition` variable drives the button sizing:
+
+```typescript
+const widthCondition = notifyOpen ? "w-auto h-11" : "w-full"
+```
+
+This keeps the Navbar tidy when the notification panel is expanded to its 300 px width alongside it.
+
+---
+
+## Notifications Panel
+
+Clicking the **Notificaciones** button (BellIcon) calls `notifyHandle()`, which flips the `notifyOpen` state boolean. When open, a panel is rendered immediately to the right of the sidebar:
+
+```tsx
+{notifyOpen && (
+  <div
+    className="absolute left-full w-[300px] h-screen bg-seagreen-900 dark:bg-storm-950 text-storm-100 py-2 pr-4 flex flex-col gap-3"
+    id="notify"
+  >
+    <h3 className="text-lg font-semibold">Notificaciones</h3>
+    <p className="border-t-[1px] border-white/40">Esta semana</p>
+  </div>
+)}
+```
+
+The panel mounts at `left-full` (immediately right of the sidebar column), is `300px` wide, and spans the full viewport height. It uses `text-storm-100` for its text and `bg-seagreen-900` (light mode) / `dark:bg-storm-950` (dark mode) backgrounds.
+
+Clicking anywhere **outside** the panel closes it. The Navbar registers a `"click"` event listener in a `useEffect` that checks whether the click target is outside the `#notify` element and sets `notifyOpen` to `false` if so. The same pattern applies to the "Mas" user menu (`#main`).
+
+---
+
+## User Menu ("Mas")
+
+The **Mas** button at the bottom of the sidebar (MenuIcon) toggles a `mainActive` state boolean. When active, a popover appears just above the button:
+
+```tsx
+// Popover position
+className="absolute bottom-16 z-30 w-[12rem] py-3 bg-seagreen-900 dark:bg-storm-900 shadow-medium rounded-xl"
+```
+
+The popover contains four items:
+
+| Item | Icon | Action |
+|---|---|---|
+| Configuraciones | `SettingsIcon` | Navigate to `/home/my-profile/settings` |
+| Guardados | `BookmarksIcon` | Navigate to `/home/my-profile?bookmarks` |
+| *(Dark mode toggle)* | — | Renders `<ButtonDarkMode />` inline |
+| Salir | `LogoutIcon` | Calls the `logout()` function |
+
+---
+
+## Logout
+
+The logout flow uses NextAuth's `signOut` with `redirect: false` so the redirect URL can be handled programmatically by the router:
+
+```typescript
+const logout = async () => {
+  const data = await signOut({ redirect: false, callbackUrl: '/login' })
+  router.push(data.url)
+}
+```
+
+`signOut` returns an object containing the resolved `callbackUrl`. The component then uses `router.push(data.url)` to navigate to `/login` after the session is cleared, giving the client-side router control over the transition instead of a hard browser redirect.
+
+---
+
+## Dark Mode Toggle
+
+The `<ButtonDarkMode />` component is rendered inside the "Mas" user menu. Dark mode in Plataforma Social is **class-based**: toggling it adds or removes the `dark` class on the root `<html>` element.
+
+<Tip>
+  Dark mode is configured in `tailwind.config.ts` with `darkMode: 'class'`. This means all `dark:` utility variants activate only when an ancestor element carries the `dark` class — the `ButtonDarkMode` component is responsible for setting and persisting this class on `document.documentElement`.
+</Tip>
+
+---
+
+## Custom Color Palette
+
+The Navbar uses several custom Tailwind color tokens defined in the project's theme:
+
+| Token | Usage |
+|---|---|
+| `seagreen-900` | Navbar background (light mode), notification panel background, "Mas" popover background |
+| `lima-400` | Active and hover tint for navigation links (`bg-lima-400/30`, `bg-lima-400/50`) |
+| `biscay-950` | Dark mode active link background |
+| `biscay-900` | Dark mode hover background for links |
+| `storm-950` | Dark mode notification panel background |
+| `storm-100` | Notification panel text color |
+| `storm-900` | Dark mode "Mas" popover background |
+
+---
+
+## Settings Page Visibility
+
+The Navbar hides itself entirely when the user is on `/home/my-profile/settings`. The check runs on every render using the live `pathname` value from `usePathname()`:
+
+```tsx
+<section
+  className={`fixed flex gap-5 bg-seagreen-900 dark:bg-transparent ${
+    pathname === '/home/my-profile/settings' ? 'hidden' : ''
+  }`}
+>
+```
+
+<Info>
+  Because the settings layout has its own back-navigation button (an `ArrowLeft` button positioned at `right-full` of the content area), hiding the Navbar prevents layout overlap and provides the settings page with a clean full-width experience.
+</Info>

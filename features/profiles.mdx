@@ -1,0 +1,249 @@
+---
+title: "User Profiles, Followers, and Account Settings"
+sidebarTitle: "Profiles"
+description: "How user profile pages work, editing profile info with PUT_USER, following other users, and managing account settings and notification preferences."
+---
+
+Every authenticated user has a profile page at `/home/my-profile` that surfaces their avatar, stats, and published components. From the same page users can open the `EditProfile` modal to update their photo, username, and bio. A dedicated settings page at `/home/my-profile/settings` provides account management controls including password changes, account deletion, privacy toggles, and granular notification preferences — all backed by the `Setting` model in the database.
+
+## My Profile Page (`/home/my-profile`)
+
+The profile page is composed of two main components: `InfoProfile` (static display) and `EditProfile` (modal overlay). The page queries the GraphQL API for the current user's data using `GET_USER` with the session's `user.id` as the variable:
+
+```typescript
+// frontend/app/home/my-profile/page.tsx
+function MyProfile() {
+  const [isEditMode, setIsEditMode] = useState(false)
+  const { data: session, status } = useSession()
+  const { loading, error, data } = useQuery(GET_USER, {
+    variables: {
+      id: session?.user.id
+    }
+  })
+
+  const handleEditMode = (state: boolean) => {
+    setIsEditMode(state)
+  }
+
+  return (
+    <>
+      <section className='flex gap-5'>
+        <InfoProfile handleEditMode={handleEditMode} user={data?.getUser}/>
+      </section>
+      <Badge />
+      <section className='flex flex-col gap-5 w-full items-center'>
+        <CardPost />
+        <CardPost />
+      </section>
+      {isEditMode && (
+        <div className="absolute top-0 bottom-0 left-0 right-0 bg-black/50 flex justify-center items-center">
+          <EditProfile onClose={handleEditMode} user={data?.getUser}/>
+        </div>
+      )}
+    </>
+  )
+}
+```
+
+### InfoProfile Component
+
+`InfoProfile` renders the user's public-facing information. The avatar falls back to a placeholder image when the `avatar` field is an empty string:
+
+```typescript
+// frontend/app/components/profile/InfoProfile.tsx
+<Image
+  src={user?.avatar !== "" ? user?.avatar : "/LogoUVM.jpg"}
+  alt='Avatar'
+  width={120}
+  height={120}
+  className='aspect-square size-[120px]'
+/>
+```
+
+Below the avatar, the component shows:
+
+<CardGroup cols={3}>
+  <Card title="Username" icon="user">
+    Displayed as an `<h2>` alongside **Editar Perfil** (opens `EditProfile` modal), a share button (`ShareRightIcon`), and an options button (`DotsIcon`).
+  </Card>
+  <Card title="Stats Row" icon="chart-bar">
+    Three counters side by side: **Seguidores** (followers), **Seguidos** (following), and **Componentes** (total published components).
+  </Card>
+  <Card title="Description" icon="align-left">
+    Free-text bio paragraph (`max-w-[60ch]`) from the `description` field, displayed as-is with no truncation on the profile page.
+  </Card>
+</CardGroup>
+
+### Profile Tabs (Badge)
+
+Below `InfoProfile` the `Badge` component renders two tab-style buttons: **Componentes** (active by default, highlighted with a top border) and **Guardados** (bookmarked posts). These filter which posts are listed beneath the profile header.
+
+## Editing Your Profile
+
+Clicking **Editar Perfil** sets `isEditMode` to `true`, which renders `EditProfile` inside a full-screen dark overlay. The modal can be dismissed via the **×** button in the header or the **Cancelar** button in the footer.
+
+### EditProfile Fields
+
+<Accordion title="Profile photo upload">
+  The file input (`type="file"`, `id="avatar"`) is hidden and triggered via its `<label>`. When a file is selected, `URL.createObjectURL` generates a local preview URL rendered immediately in the `<Image>` component — no upload occurs until the form is saved.
+
+  ```typescript
+  // frontend/app/components/profile/EditProfile.tsx
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const selectFile = files[0];
+    setDataImg(selectFile);
+    setPreview(URL.createObjectURL(selectFile));
+  }
+
+  const avatarSrc = preview || user?.avatar || Logo?.src;
+  ```
+</Accordion>
+
+<Accordion title="Username field">
+  A standard text `<Input>` pre-populated with the current username. The value must be unique across the platform — the server returns an error if the chosen name is already taken.
+</Accordion>
+
+<Accordion title="Description textarea (250-char limit)">
+  A `<textarea>` with a live character counter. When the character count exceeds 250 the textarea ring turns red (`ring-2 ring-maroon-800`) and the counter label turns red as well, providing immediate visual feedback without blocking submission until the mutation enforces the limit.
+
+  ```typescript
+  // frontend/app/components/profile/EditProfile.tsx
+  let limitClasses = {
+    textArea: dataEdit?.description.length > 250
+      ? "ring-2 ring-maroon-800"
+      : "ring-seagreen-950",
+    span: dataEdit?.description.length > 250
+      ? "text-maroon-900 font-normal"
+      : "font-light"
+  }
+
+  // Counter display:
+  <span className={`${limitClasses.span} text-sm`}>
+    {`${dataEdit?.description.length}/250`}
+  </span>
+  ```
+</Accordion>
+
+### PUT_USER GraphQL Mutation
+
+Clicking **Guardar** in the `EditProfile` footer fires the `PUT_USER` mutation with the updated fields:
+
+```graphql
+# frontend/app/lib/graphql/users.ts
+mutation PutUser($putUserId: String!, $username: String, $description: String, $avatar: String) {
+  putUser(id: $putUserId, username: $username, description: $description, avatar: $avatar) {
+    id
+    username
+    email
+    description
+    avatar
+  }
+}
+```
+
+All three update fields (`username`, `description`, `avatar`) are optional — only fields whose values have changed need to be sent. The mutation returns the full updated user object, which Apollo Client uses to update the cache and re-render `InfoProfile` automatically.
+
+## Following System
+
+Users can follow and unfollow each other from two surfaces: the inline **Seguir / Siguiendo** button on every `CardPost` card in the feed, and profile pages. Follow state is managed by a `Follower` join table in the database:
+
+```prisma
+// server/prisma/schema.prisma
+model Follower {
+  follower    User     @relation("UserFollowers", fields: [idFollower], references: [id])
+  idFollower  String
+
+  following   User     @relation("UserFollowing", fields: [idFollowing], references: [id])
+  idFollowing String
+
+  @@id([idFollower, idFollowing])
+}
+```
+
+The `CardPost` component toggles between **Seguir** (outline style) and **Siguiendo** (solid style) using local state:
+
+```typescript
+// frontend/app/components/ui/CardPost.tsx
+const [isFollowing, setIsFollowing] = useState(false)
+const handleFollowing = () => {
+  setIsFollowing(!isFollowing)
+}
+
+// Rendered conditionally:
+{isFollowing ? (
+  <Button variant='solid' color='primary' onClick={handleFollowing}>
+    Siguiendo
+  </Button>
+) : (
+  <Button variant='outline' color='primary' onClick={handleFollowing}>
+    Seguir
+  </Button>
+)}
+```
+
+Follower and following counts are displayed prominently in `InfoProfile` as part of the stats row.
+
+## Settings Page (`/home/my-profile/settings`)
+
+The settings page is accessed via the **Configuraciones** menu item in the Navbar's "Mas" dropdown. The page is structured with a left sidebar of anchor links and a right content panel that scrolls through three sections. The Navbar is hidden on this route (`pathname === '/home/my-profile/settings'`).
+
+```typescript
+// frontend/app/home/my-profile/settings/page.tsx
+const paths = {
+  default:        '/home/my-profile/settings',
+  administrar:    '/home/my-profile/settings#administrar-cuenta',
+  privacidad:     '/home/my-profile/settings#privacidad',
+  notificaciones: '/home/my-profile/settings#notificaciones',
+}
+```
+
+### Section 1 — Administrar cuenta
+
+Contains two sub-sections:
+
+- **Control de cuenta**: a destructive **Eliminar** button to permanently delete the account.
+- **Datos de la cuenta**: a navigation arrow button to the Change Password flow.
+
+### Section 2 — Privacidad
+
+A single **Cuenta privada** toggle (`SwitchButton`) backed by the `private` boolean on the `Setting` model. When enabled, the user's posts and profile are not visible to users who do not follow them.
+
+### Section 3 — Notificaciones
+
+Notification preferences are split into **Notificaciones de escritorio** and **Notificaciones al correo**, each controlled by individual `SwitchButton` toggles that map directly to fields on the `Setting` model:
+
+| Toggle label | Setting field | Type | Default |
+|---|---|---|---|
+| Calificaciones (desktop) | `n_ratings` | Boolean | `true` |
+| Comentarios (desktop) | `n_comments` | Boolean | `true` |
+| Nuevos seguidores (desktop) | `n_followers` | Boolean | `true` |
+| Componentes populares (desktop) | `n_populates` | Boolean | `true` |
+| Calificaciones (email) | `n_email_ratings` | Boolean | `true` |
+| Comentarios (email) | `n_email_comments` | Boolean | `true` |
+| Nuevos seguidores (email) | `n_email_followers` | Boolean | `true` |
+
+The full `Setting` model from the Prisma schema:
+
+```prisma
+// server/prisma/schema.prisma
+model Setting {
+  idSettings        String  @id @default(uuid())
+  user              User    @relation(fields: [idUser], references: [id], onDelete: Cascade)
+  idUser            String  @unique
+  private           Boolean @default(false)
+  n_ratings         Boolean @default(true)
+  n_comments        Boolean @default(true)
+  n_followers       Boolean @default(true)
+  n_populates       Boolean @default(true)
+  n_email_ratings   Boolean @default(true)
+  n_email_comments  Boolean @default(true)
+  n_email_followers Boolean @default(true)
+}
+```
+
+<Tip>
+  A `Setting` record is automatically created for every new user when the `postUser` mutation runs on the server. All notification flags default to `true`, so new users receive all notification types until they opt out in the settings page.
+</Tip>

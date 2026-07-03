@@ -1,0 +1,162 @@
+---
+title: "CardPost Component: Component Feed Card"
+sidebarTitle: "CardPost"
+description: "CardPost renders a social feed post card with author info, tech stack tags, a preview image, star ratings, comments, and follow/unfollow actions."
+---
+
+`CardPost` is the primary feed item component displayed on the `/home` and `/home/search` pages. It renders a component post with author information, a truncated description, tech stack tag buttons, a preview image, a star rating, and social action icons. The component is a `"use client"` component that manages local UI state for the follow/unfollow toggle. It is currently built with placeholder data and is ready for API integration once a `Post` data prop is introduced.
+
+```tsx
+import CardPost from "@/components/ui/CardPost"
+```
+
+## Props
+
+`CardPost` currently accepts no props. All content is rendered from internal placeholder data. Connecting the component to live data requires refactoring to accept a `Post` object as a prop — see the [API integration note](#api-integration) below.
+
+```tsx
+<CardPost />
+```
+
+---
+
+## Component Structure
+
+### Header
+
+The card header contains three elements arranged in a horizontal row:
+
+- **Author avatar** — rendered with `UserIcon` (size `size-5`).
+- **Username link** — wrapped in a `<Link>` pointing to `/home/profile/:id`. Clicking navigates to the author's profile page.
+- **Follow/unfollow toggle** — a `Button` whose `variant` and label switch based on local `isFollowing` state (see [Follow Toggle](#follow--unfollow-toggle) below).
+- **Timestamp** — a muted `<span>` showing relative time (e.g. `18hrs`), styled with `opacity-75`.
+
+### Body
+
+The card body is split into a left content column and a right image column:
+
+- **Post title** — an `<h3>` wrapped in a `<Link>` to `/home/post`. Bold, `text-lg`.
+- **Truncated description** — a `<p>` rendering up to 290 characters of the post description via `truncateText`. Overflow is replaced with `"..."`.
+- **Tech stack tags** — a row of `Button` components using `variant="flat"`, `color="secondary"`, `shape="full"`, `size="sm"`. Each tag is a `<Link>` to `/home/search?tech=<tag>`, enabling filtered search from the feed.
+- **Preview image** — a Next.js `<Image>` (120×120) in the right column, below which a "Vista Previa" `Button` is displayed.
+
+### Footer
+
+The card footer is separated from the body by a top border (`border-t border-seagreen-950/40 dark:border-white/40`) and contains four items:
+
+| Element            | Detail                                                       |
+| ------------------ | ------------------------------------------------------------ |
+| Star rating        | Five `StarIcon` components — filled stars use `fill-yellow-400 stroke-yellow-400`, empty stars are unstyled. |
+| Numeric rating     | A `<p>` displaying the float rating (e.g. `3.2`), styled `font-light`. |
+| Comment count      | `MessageIcon` + a `<p>` with the count (e.g. `12`), `font-light`. |
+| Share action       | `ShareIcon` (size `size-5`), no label.                       |
+| Bookmark action    | `BookmarkPlusIcon` (size `size-5`), no label.                |
+
+---
+
+## Follow / Unfollow Toggle
+
+The follow state is managed locally with `useState`. `handleFollowing` toggles `isFollowing` on click. The two states render different `Button` variants to communicate the current relationship clearly:
+
+```tsx
+const [isFollowing, setIsFollowing] = useState(false)
+
+{isFollowing ? (
+  <Button
+    variant="solid"
+    color="primary"
+    shape="md"
+    size="md"
+    className="px-3 py-0.5"
+    onClick={handleFollowing}
+  >
+    Siguiendo
+  </Button>
+) : (
+  <Button
+    variant="outline"
+    color="primary"
+    shape="md"
+    size="md"
+    className="px-3 py-0.5 dark:bg-inherit dark:ring-white dark:text-white"
+    onClick={handleFollowing}
+  >
+    Seguir
+  </Button>
+)}
+```
+
+- **Following** (`isFollowing: true`) → `solid` + `primary`: filled seagreen background, white label "Siguiendo".
+- **Not following** (`isFollowing: false`) → `outline` + `primary`: transparent background with seagreen ring, label "Seguir". Dark mode overrides (`dark:bg-inherit dark:ring-white dark:text-white`) maintain contrast against the card's transparent dark background.
+
+<Tip>
+  The `dark:bg-inherit` override on the outline button is necessary because the `outline` variant sets `bg-storm-50` by default. On the card's dark background (`dark:bg-transparent`), `storm-50` would appear as an opaque light fill. `dark:bg-inherit` corrects this by inheriting the card's transparent background instead.
+</Tip>
+
+---
+
+## Text Truncation
+
+The description is truncated using the `truncateText` utility defined inside `CardPost.tsx`. It preserves words up to `maxLength` characters, then appends `"..."`:
+
+```typescript
+function truncateText(text: string, maxLength: number) {
+  if (text.length <= maxLength) {
+    return text
+  }
+  return text.slice(0, maxLength - 3) + "..."
+}
+```
+
+The description is capped at **290 characters** in the current implementation:
+
+```tsx
+<p className="text-lg max-w-[50ch] px-2">
+  {truncateText(description, 290)}
+</p>
+```
+
+---
+
+## Tailwind Styling
+
+The outer `<article>` element carries the card's container styles:
+
+```tsx
+<article className="flex flex-col gap-3 p-3 w-full max-w-3xl rounded-2xl ring-1 ring-seagreen-900 bg-white dark:bg-transparent dark:ring-white">
+```
+
+| Property       | Light mode              | Dark mode               |
+| -------------- | ----------------------- | ----------------------- |
+| Background     | `bg-white`              | `dark:bg-transparent`   |
+| Border         | `ring-1 ring-seagreen-900` | `dark:ring-white`    |
+| Max width      | `max-w-3xl`             | —                       |
+| Border radius  | `rounded-2xl`           | —                       |
+
+---
+
+## API Integration
+
+<Note>
+  `CardPost` currently renders hardcoded placeholder data (a lorem ipsum description, a static image, placeholder username, and fixed rating values). To connect it to the GraphQL API, refactor the component signature to accept a `Post` prop containing the fields below, and replace each placeholder with the corresponding prop value.
+
+  ```typescript
+  interface Post {
+    id: string
+    title: string
+    description: string
+    author: {
+      id: string
+      username: string
+      avatarUrl?: string
+    }
+    techStack: string[]
+    previewImageUrl: string
+    rating: number
+    commentCount: number
+    createdAt: string
+  }
+
+  function CardPost({ post }: { post: Post }) { ... }
+  ```
+</Note>

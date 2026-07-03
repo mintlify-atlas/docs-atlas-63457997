@@ -1,0 +1,190 @@
+---
+title: "Database Schema: Prisma Models and Relationships"
+sidebarTitle: "DB Schema"
+description: "Complete reference for the Prisma ORM schema powering Plataforma Social — all 8 MySQL models, their fields, relationships, and cascade delete rules."
+---
+
+The Plataforma Social backend uses **Prisma ORM** with a **MySQL** database. Every primary key across all models is a UUID generated automatically by Prisma's `@default(uuid())` directive, ensuring globally unique identifiers without relying on auto-incrementing integers. The schema is defined in `server/prisma/schema.prisma` and the initial database state is established via a single migration generated with `npm run migrate`.
+
+## Full Schema
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  username    String   @unique
+  password    String
+  description String   @default("")
+  avatar      String   @default("")
+  createdAt   DateTime @default(now())
+
+  Setting  Setting?
+  Post      Post[]
+  Comment   Comment[]
+  Rating   Rating[]
+  followers   Follower[] @relation("UserFollowers")
+  following   Follower[] @relation("UserFollowing")
+}
+
+model Setting {
+  idSettings        String  @id @default(uuid())
+  user              User    @relation(fields: [idUser], references: [id], onDelete: Cascade)
+  idUser            String  @unique
+  private           Boolean @default(false)
+  n_ratings         Boolean @default(true)
+  n_comments        Boolean @default(true)
+  n_followers       Boolean @default(true)
+  n_populates       Boolean @default(true)
+  n_email_ratings   Boolean @default(true)
+  n_email_comments  Boolean @default(true)
+  n_email_followers Boolean @default(true)
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [idUser], references: [id], onDelete: Cascade)
+  idUser      String
+  title       String
+  description String
+  UpdatedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  Comment Comment[]
+  Stack   Stack[]
+  Rating Rating[]
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  post      Post     @relation(fields: [idPost], references: [id], onDelete: Cascade)
+  idPost    String
+  user      User     @relation(fields: [idUser], references: [id], onDelete: Cascade)
+  idUser    String
+  comment   String
+  createdAt DateTime @default(now())
+}
+
+model Technology {
+  id   String @id @default(uuid())
+  name String @unique
+
+  Stack Stack[]
+}
+
+model Stack {
+  idPost       String
+  post         Post       @relation(fields: [idPost], references: [id], onDelete: Cascade)
+  idTechnology String
+  tech         Technology @relation(fields: [idTechnology], references: [id], onDelete: Cascade)
+
+  @@id([idPost, idTechnology])
+}
+
+model Rating {
+  id     String @id @default(uuid())
+  post   Post   @relation(fields: [idPost], references: [id], onDelete: Cascade)
+  idPost String
+  user   User   @relation(fields: [idUser], references: [id], onDelete: Cascade)
+  idUser String
+  rating Float
+}
+
+model Follower {
+  follower    User     @relation("UserFollowers", fields: [idFollower], references: [id])
+  idFollower  String
+  
+  following   User     @relation("UserFollowing", fields: [idFollowing], references: [id])
+  idFollowing String
+
+  @@id([idFollower, idFollowing])
+}
+```
+
+## Model Overview
+
+The schema contains **8 models** that together represent users, their content, social interactions, and notification preferences.
+
+| Model | Description |
+|---|---|
+| **User** | Core account entity storing credentials, profile info, and timestamps. |
+| **Setting** | Per-user privacy and notification preferences; one-to-one with `User`. |
+| **Post** | A piece of content published by a user, containing a title and description. |
+| **Comment** | A text comment left by a user on a specific post. |
+| **Technology** | A named technology tag (e.g. "React", "Node.js") that can be applied to posts. |
+| **Stack** | Join table linking a `Post` to one or more `Technology` entries (tech tags). |
+| **Rating** | A numeric rating (Float) given by a user to a post. |
+| **Follower** | Self-referential join table on `User` representing follow relationships. |
+
+## Key Relationships
+
+### User → Setting
+Each `User` has at most one `Setting` record (`Setting?`). The `Setting` row is created automatically when a new user registers, using sensible defaults for all notification toggles.
+
+### User → Posts
+A `User` has many `Post` records (`Post[]`). Each post stores the author's `idUser` as a foreign key.
+
+### Post → Comments, Ratings, and Stacks
+A `Post` has three child collections:
+- **`Comment[]`** — text comments submitted by any user.
+- **`Rating[]`** — numeric score entries submitted by any user.
+- **`Stack[]`** — technology tag entries linking the post to `Technology` records.
+
+### Stack — Post ↔ Technology (join table)
+`Stack` is a pure join table with a **composite primary key** of `[idPost, idTechnology]`. It has no surrogate UUID — the combination of the two foreign keys is itself the unique identifier. This means a given technology can only be tagged once per post.
+
+### Follower — Self-referential User relationship
+`Follower` is a self-referential join table on `User` with a **composite primary key** of `[idFollower, idFollowing]`. It models directed follow relationships using two named Prisma relations:
+
+- **`UserFollowers`** — the set of users who follow a given user (`followers` field on `User`).
+- **`UserFollowing`** — the set of users that a given user follows (`following` field on `User`).
+
+<Note>
+  The `Follower` foreign keys use `onDelete: Restrict` (the MySQL default applied by Prisma when no `onDelete` is specified for self-referential relations). This means you must unfollow before deleting either the follower or the followed account, or handle deletion order in application logic.
+</Note>
+
+## Cascade Delete Behavior
+
+Prisma enforces referential integrity at the database level through `ON DELETE CASCADE` constraints, defined in `onDelete: Cascade` on the relation fields.
+
+| Deleted record | Automatically deletes |
+|---|---|
+| `User` | `Setting`, all `Post` records, all `Comment` records, all `Rating` records |
+| `Post` | all `Comment` records on that post, all `Rating` records on that post, all `Stack` entries for that post |
+| `Technology` | all `Stack` entries referencing that technology |
+
+<Warning>
+  Deleting a `User` is a destructive, irreversible operation. All of the user's posts, comments, and ratings are permanently removed along with their settings row due to cascading deletes.
+</Warning>
+
+## Migrations
+
+The initial database structure lives at:
+
+```
+server/prisma/migrations/20240611205243_init/migration.sql
+```
+
+This SQL file was generated automatically by running:
+
+```bash
+npm run migrate
+```
+
+After making any changes to `schema.prisma`, apply and record the change as a new migration with:
+
+```bash
+npx prisma migrate dev --name <migration-name>
+```
+
+<Tip>
+  Use descriptive migration names that reflect what changed, for example `npx prisma migrate dev --name add_post_tags`. Prisma will generate a new timestamped folder under `server/prisma/migrations/` containing the diff SQL.
+</Tip>

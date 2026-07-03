@@ -1,0 +1,206 @@
+---
+title: "Plataforma Social Architecture Overview"
+sidebarTitle: "Architecture"
+description: "A deep dive into the monorepo structure, backend GraphQL service, Next.js frontend, data models, and how every layer communicates at runtime."
+---
+
+Plataforma Social is organized as a monorepo containing two independent, self-contained applications: a Node.js GraphQL API server under `/server` and a Next.js 14 frontend under `/frontend`. Each application has its own `package.json`, environment file, and development server, but they communicate over a single HTTP endpoint at runtime.
+
+## Repository Structure
+
+The top-level layout separates all server-side concerns from all client-side concerns:
+
+```
+Plataforma-social/
+├── server/          # Express + Apollo Server + Prisma
+│   ├── src/
+│   │   ├── index.ts          # Server entry point
+│   │   └── graphql/          # typeDefs and resolvers
+│   ├── prisma/
+│   │   └── schema.prisma     # Database schema & migrations
+│   └── package.json
+└── frontend/        # Next.js 14 App Router
+    ├── app/
+    │   ├── layout.tsx         # Root layout with providers
+    │   ├── lib/               # Apollo & session wrappers
+    │   └── ...
+    ├── middleware.ts           # Route protection
+    └── package.json
+```
+
+## Backend
+
+The backend is a Node.js HTTP server that exposes a single GraphQL endpoint. All source code lives in `server/src/index.ts` and the `server/src/graphql/` directory.
+
+### Express.js HTTP Server
+
+The application bootstraps an Express app, applies global middleware, and then delegates all GraphQL traffic to Apollo Server:
+
+```typescript
+import express from 'express';
+import morgan from 'morgan';
+import cors from 'cors';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+
+const app = express();
+const PORT = process.env.PORT || 4005;
+
+const server = new ApolloServer({ typeDefs, resolvers });
+
+const main = async () => {
+  await server.start();
+
+  app.use(express.json());
+  app.use(morgan('dev'));
+  app.use(cors());
+
+  app.use('/graphql', expressMiddleware(server));
+};
+
+main().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running in port http://localhost:${PORT}`);
+  });
+});
+```
+
+Key characteristics of the backend layer:
+
+- **Apollo Server 4** — schema-first GraphQL server started with `server.start()` and mounted via `expressMiddleware` at the `/graphql` path
+- **Express.js** — lightweight HTTP server hosting the middleware chain (`json`, `morgan`, `cors`) before delegating to Apollo
+- **CORS enabled** — `cors()` with default settings allows cross-origin requests from the Next.js frontend running on a different port
+- **Morgan logging** — HTTP request logs in `dev` format for local development visibility
+- **Default port: 4005** — controlled by `process.env.PORT`, falling back to `4005` when the variable is not set
+- **bcrypt** — used in mutation resolvers for hashing user passwords before persistence and for comparing hashes during login
+
+### Prisma ORM & MySQL
+
+Prisma is configured in `server/prisma/schema.prisma` with MySQL as the data source:
+
+```prisma
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+```
+
+Running `npm run generate` (alias for `prisma generate`) produces the fully typed `@prisma/client`. Running `npm run migrate` (alias for `prisma migrate dev --name init`) pushes the schema to the MySQL database and creates the migration history.
+
+## Frontend
+
+The frontend is a Next.js 14 application using the App Router. The root layout at `frontend/app/layout.tsx` wraps the entire tree in two context providers: `SessionWrapper` (NextAuth) and `ApolloWrapper` (Apollo Client).
+
+### Next.js 14 App Router
+
+```typescript
+// frontend/app/layout.tsx
+import { ApolloWrapper } from "./lib/apollo-wrapper";
+import { SessionWrapper } from "./lib/session-wrapper";
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className="scroll-smooth">
+      <body className={clsx(inter.className, "bg-storm-50 text-seagreen-950 dark:bg-storm-950 dark:text-white")}>
+        <SessionWrapper>
+          <ApolloWrapper>
+            {children}
+          </ApolloWrapper>
+        </SessionWrapper>
+      </body>
+    </html>
+  );
+}
+```
+
+- **Next.js 14** — App Router with React Server Components (RSC) and streaming SSR
+- **Barlow font** — loaded via `next/font/google` across all weights (`100`–`900`)
+- **Custom Tailwind palette** — `storm` (backgrounds) and `seagreen` (text/accents) color scales with full dark-mode support
+
+### Apollo Client
+
+Apollo Client is configured for the Next.js App Router using the `@apollo/experimental-nextjs-app-support` package, which provides SSR-safe context and avoids singleton issues in React Server Components. All queries and mutations from both Server and Client Components route through the `ApolloWrapper` provider.
+
+### NextAuth Session Management
+
+Authentication is handled by NextAuth v4 with a credentials provider. The `SessionWrapper` exposes the `useSession` hook and `SessionProvider` context to all client components. Protected routes are gated at the middleware layer before any page code runs.
+
+### Route Protection via Middleware
+
+```typescript
+// frontend/middleware.ts
+export { default } from 'next-auth/middleware';
+
+export const config = {
+  matcher: ["/home/:path*"],
+};
+```
+
+The Next.js middleware re-exports NextAuth's built-in middleware and applies it to all routes matching `/home/:path*`. Any unauthenticated request to the `/home` subtree is redirected to the sign-in page automatically, before the request reaches any route handler or page component.
+
+## Communication Flow
+
+All runtime communication follows a single path from the browser through to the database:
+
+```
+Browser
+  └─▶ Next.js (SSR / React Server Components)
+        └─▶ Apollo Client  (POST http://localhost:4005/graphql)
+              └─▶ Apollo Server 4  (expressMiddleware @ /graphql)
+                    └─▶ Prisma ORM  (type-safe query builder)
+                          └─▶ MySQL Database
+```
+
+- The browser loads pages rendered by Next.js, which may pre-fetch data on the server via Apollo Client before hydrating the client.
+- Apollo Client always sends GraphQL operations as HTTP `POST` requests to the single `/graphql` endpoint configured in `API_ROUTE`.
+- Apollo Server receives the operation, runs the matching resolver, and delegates all data access to Prisma.
+- Prisma translates the resolver calls into optimized SQL and executes them against MySQL, returning typed result objects back up the chain.
+
+## Data Models
+
+The following models are defined in `server/prisma/schema.prisma` and represent the full relational schema of the application:
+
+| Model | Purpose |
+|---|---|
+| `User` | Core identity record: `id`, `email`, `username`, `password` (hashed), `description`, `avatar`, `createdAt` |
+| `Post` | A published UI component: `title`, `description`, timestamps, and a relation to the authoring `User` |
+| `Comment` | A user's text comment on a `Post`, linked to both `User` and `Post` with cascade deletes |
+| `Rating` | A numeric `Float` rating given by a `User` to a `Post` |
+| `Technology` | A unique technology tag (e.g. `React`, `Vue`) that can be applied to posts via a `Stack` join |
+| `Stack` | Join table linking a `Post` to one or more `Technology` records (composite primary key) |
+| `Setting` | Per-user notification preferences (in-app and email toggles) with a one-to-one relation to `User` |
+| `Follower` | Self-referential many-to-many relationship on `User` tracking follower/following pairs (composite primary key) |
+
+<Info>
+  All primary keys are UUIDs generated with `@default(uuid())`. Cascade deletes are applied on child models (posts, comments, ratings, settings) so that removing a user cleans up all related records automatically.
+</Info>
+
+## Explore Further
+
+<CardGroup cols={3}>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api/overview"
+  >
+    Browse every available GraphQL query and mutation, with argument types and example responses.
+  </Card>
+  <Card
+    title="Database Schema"
+    icon="database"
+    href="/api/schema"
+  >
+    Full Prisma schema with field types, relations, and index definitions for all eight models.
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/configuration/environment"
+  >
+    Complete reference for all environment variables used by the server and the frontend.
+  </Card>
+</CardGroup>

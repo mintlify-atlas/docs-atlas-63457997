@@ -1,0 +1,227 @@
+---
+title: "GraphQL Mutations: Create, Update, and Delete Users"
+sidebarTitle: "Mutations"
+description: "Reference for all three GraphQL mutations: postUser creates a user, putUser updates profile fields, and deleteUser permanently removes a user and all related data."
+---
+
+Plataforma Social provides three mutations for managing user accounts. `postUser` registers a new user and provisions their default settings; `putUser` updates one or more profile fields; and `deleteUser` permanently removes a user along with every piece of data associated with them. All mutations are sent as `POST` requests to `/graphql` — see the [API Overview](/api/overview) for request formatting details.
+
+---
+
+## postUser
+
+```graphql
+postUser(username: String!, email: String!, password: String!): User
+```
+
+Registers a new user account. The supplied plain-text password is hashed with **bcrypt** (10 salt rounds) before it is stored. After creating the user row, the resolver automatically provisions a default `Setting` record for them so that their notification and privacy preferences are available immediately.
+
+**Parameters:**
+
+<ParamField body="username" type="String" required>
+  The desired display name for the new account. Must be unique across all users — the resolver checks for conflicts before writing.
+</ParamField>
+
+<ParamField body="email" type="String" required>
+  The email address for the new account. Must be unique across all users — the resolver checks for conflicts before writing.
+</ParamField>
+
+<ParamField body="password" type="String" required>
+  The plain-text password chosen by the user. It is hashed with bcrypt (10 salt rounds) before being stored; the raw value is never persisted.
+</ParamField>
+
+**Return type:** `User`
+
+**Errors:**
+
+| Condition | Message |
+|-----------|---------|
+| `username` is already taken | `Nombre de usuario ya esta en uso` |
+| `email` is already registered | `El correo ya esta en uso` |
+
+### Example
+
+```graphql
+mutation PostUser($username: String!, $email: String!, $password: String!) {
+  postUser(username: $username, email: $email, password: $password) {
+    id
+    username
+    email
+    description
+    avatar
+  }
+}
+```
+
+**Variables:**
+
+```json
+{
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password": "securepassword123"
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "postUser": {
+      "id": "new-uuid-here",
+      "username": "johndoe",
+      "email": "john@example.com",
+      "description": null,
+      "avatar": null
+    }
+  }
+}
+```
+
+<Tip>
+  After a successful `postUser`, a `Setting` row is automatically created for the new user with all notification flags set to their defaults. There is no need to create settings separately.
+</Tip>
+
+---
+
+## putUser
+
+```graphql
+putUser(id: String!, username: String, description: String, avatar: String): User
+```
+
+Updates one or more profile fields on an existing user. Only `id` is required; all other fields are optional and will be updated only when supplied. Fields not included in the call are left unchanged.
+
+**Parameters:**
+
+<ParamField body="id" type="String" required>
+  The UUID of the user to update.
+</ParamField>
+
+<ParamField body="username" type="String">
+  A new display name for the user. When provided, uniqueness is enforced — the resolver will reject the update if the username is already held by another account.
+</ParamField>
+
+<ParamField body="description" type="String">
+  A short profile bio or description. Pass an empty string to clear the existing value.
+</ParamField>
+
+<ParamField body="avatar" type="String">
+  A URL pointing to the user's profile image. Must be a fully qualified URL string (e.g. `https://cdn.example.com/avatars/johndoe.png`).
+</ParamField>
+
+**Return type:** `User` — the full user record after applying the update.
+
+**Errors:**
+
+| Condition | Message |
+|-----------|---------|
+| `username` is already taken by another user | `Nombre de usuario ya esta en uso` |
+
+### Example
+
+```graphql
+mutation PutUser(
+  $putUserId: String!
+  $username: String
+  $description: String
+  $avatar: String
+) {
+  putUser(
+    id: $putUserId
+    username: $username
+    description: $description
+    avatar: $avatar
+  ) {
+    id
+    username
+    email
+    description
+    avatar
+  }
+}
+```
+
+**Variables:**
+
+```json
+{
+  "putUserId": "uuid-here",
+  "username": "johndoe_updated",
+  "description": "Full-stack developer and open source contributor",
+  "avatar": "https://cdn.example.com/avatars/johndoe.png"
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "putUser": {
+      "id": "uuid-here",
+      "username": "johndoe_updated",
+      "email": "john@example.com",
+      "description": "Full-stack developer and open source contributor",
+      "avatar": "https://cdn.example.com/avatars/johndoe.png"
+    }
+  }
+}
+```
+
+---
+
+## deleteUser
+
+```graphql
+deleteUser(id: String!): ResponseID
+```
+
+Permanently deletes a user account. Because the database schema is configured with cascading deletes, removing a user also removes all data that belongs to them — including their Settings, Posts, Comments, and Ratings.
+
+<Warning>
+  This operation is **irreversible**. All content created by the user — posts, comments, ratings, and settings — will be permanently deleted along with the account. There is no soft-delete or recovery mechanism.
+</Warning>
+
+**Parameters:**
+
+<ParamField body="id" type="String" required>
+  The UUID of the user to delete.
+</ParamField>
+
+**Return type:** `ResponseID`
+
+<ResponseField name="id" type="String">
+  The UUID of the user that was deleted. Useful for confirming which record was removed or for updating client-side caches.
+</ResponseField>
+
+### Example
+
+```graphql
+mutation DeleteUser($id: String!) {
+  deleteUser(id: $id) {
+    id
+  }
+}
+```
+
+**Variables:**
+
+```json
+{
+  "id": "uuid-here"
+}
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "deleteUser": {
+      "id": "uuid-here"
+    }
+  }
+}
+```
