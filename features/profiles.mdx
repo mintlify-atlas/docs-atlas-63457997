@@ -40,6 +40,12 @@ function MyProfile() {
           <EditProfile onClose={handleEditMode} user={data?.getUser}/>
         </div>
       )}
+      <Button
+        className='fixed bottom-5 right-5 px-3'
+        startContent={<PlusIcon />}
+      >
+        Crear
+      </Button>
     </>
   )
 }
@@ -138,13 +144,33 @@ mutation PutUser($putUserId: String!, $username: String, $description: String, $
     id
     username
     email
+    password
     description
     avatar
   }
 }
 ```
 
-All three update fields (`username`, `description`, `avatar`) are optional — only fields whose values have changed need to be sent. The mutation returns the full updated user object, which Apollo Client uses to update the cache and re-render `InfoProfile` automatically.
+The `handleSubmit` function in `EditProfile` calls the mutation with the three editable fields:
+
+```typescript
+// frontend/app/components/profile/EditProfile.tsx
+const handleSubmit = () => {
+  putUser({
+    variables: {
+      avatar: dataEdit?.avatar,
+      username: dataEdit?.username,
+      description: dataEdit?.description
+    }
+  })
+}
+```
+
+<Warning>
+  The `$putUserId` variable is declared as required (`String!`) in the `PUT_USER` mutation, but the current `handleSubmit` implementation does not pass it in the `variables` object. The `id` value is available on `dataEdit.id` (populated from the `user` prop). This means the server will receive the mutation without an `id`, which will cause a GraphQL validation error at runtime.
+</Warning>
+
+The three update fields (`username`, `description`, `avatar`) are optional — only fields whose values have changed need to be sent. The mutation returns the full updated user object including the hashed `password` field.
 
 ## Following System
 
@@ -174,11 +200,25 @@ const handleFollowing = () => {
 
 // Rendered conditionally:
 {isFollowing ? (
-  <Button variant='solid' color='primary' onClick={handleFollowing}>
+  <Button
+    variant='solid'
+    color='primary'
+    shape='md'
+    size='md'
+    className='px-3 py-0.5'
+    onClick={handleFollowing}
+  >
     Siguiendo
   </Button>
 ) : (
-  <Button variant='outline' color='primary' onClick={handleFollowing}>
+  <Button
+    variant='outline'
+    color='primary'
+    shape='md'
+    size='md'
+    className='px-3 py-0.5 dark:bg-inherit dark:ring-white dark:text-white'
+    onClick={handleFollowing}
+  >
     Seguir
   </Button>
 )}
@@ -209,21 +249,28 @@ Contains two sub-sections:
 
 ### Section 2 — Privacidad
 
-A single **Cuenta privada** toggle (`SwitchButton`) backed by the `private` boolean on the `Setting` model. When enabled, the user's posts and profile are not visible to users who do not follow them.
+Contains a **Visibilidad** sub-section with a single **Cuenta privada** toggle (`SwitchButton`) backed by the `private` boolean on the `Setting` model. When enabled, the user's posts and profile are not visible to users who do not follow them.
 
 ### Section 3 — Notificaciones
 
-Notification preferences are split into **Notificaciones de escritorio** and **Notificaciones al correo**, each controlled by individual `SwitchButton` toggles that map directly to fields on the `Setting` model:
+Notification preferences are split into **Notificaciones de escritorio** and **Notificaciones al correo**, each controlled by individual `SwitchButton` toggles that map directly to fields on the `Setting` model.
+
+**Notificaciones de escritorio** is further divided into two groups:
+
+| Sub-group | Toggle label | Setting field | Type | Default |
+|---|---|---|---|---|
+| Interacciones | Calificaciones | `n_ratings` | Boolean | `true` |
+| Interacciones | Comentarios | `n_comments` | Boolean | `true` |
+| Interacciones | Nuevos seguidores | `n_followers` | Boolean | `true` |
+| Del sistema | Componentes populares | `n_populates` | Boolean | `true` |
+
+**Notificaciones al correo** has a single **Interacciones** group:
 
 | Toggle label | Setting field | Type | Default |
 |---|---|---|---|
-| Calificaciones (desktop) | `n_ratings` | Boolean | `true` |
-| Comentarios (desktop) | `n_comments` | Boolean | `true` |
-| Nuevos seguidores (desktop) | `n_followers` | Boolean | `true` |
-| Componentes populares (desktop) | `n_populates` | Boolean | `true` |
-| Calificaciones (email) | `n_email_ratings` | Boolean | `true` |
-| Comentarios (email) | `n_email_comments` | Boolean | `true` |
-| Nuevos seguidores (email) | `n_email_followers` | Boolean | `true` |
+| Calificaciones | `n_email_ratings` | Boolean | `true` |
+| Comentarios | `n_email_comments` | Boolean | `true` |
+| Nuevos seguidores | `n_email_followers` | Boolean | `true` |
 
 The full `Setting` model from the Prisma schema:
 

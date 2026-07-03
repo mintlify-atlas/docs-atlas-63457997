@@ -78,9 +78,9 @@ Fetches a single user by their UUID. Use this query whenever you need the full p
 
 **Errors:**
 
-| Code | Condition |
-|------|-----------|
-| `NOT_FOUND` (404) | No user exists with the provided `id` |
+| Code | Message | Condition |
+|------|---------|-----------|
+| `NOT_FOUND` (404) | `"Not found"` | No user exists with the provided `id` |
 
 ### Example
 
@@ -169,9 +169,9 @@ Looks up a user by email address and returns their full profile together with th
 
 **Errors:**
 
-| Code | Condition |
-|------|-----------|
-| `NOT_FOUND` (404) | No user exists with the provided `email` |
+| Code | Message | Condition |
+|------|---------|-----------|
+| `NOT_FOUND` (404) | `"El usuario no fue encontrado"` | No user exists with the provided `email` |
 
 ### Example
 

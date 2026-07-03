@@ -56,11 +56,11 @@ The inner `<input>` uses `bg-inherit` so it blends into the container background
 ### Additional props
 
 <ParamField path="endContent" type="ReactNode" required>
-  The icon or element displayed in the trailing button slot. Clicking the button or pressing Enter triggers `onSubmit`. A common pattern is passing a `SearchIcon` or `MessagePlusIcon` here.
+  The icon or element displayed in the trailing button slot. Clicking the button triggers `onSubmit`. A common pattern is passing a `SearchIcon` or `MessagePlusIcon` here.
 </ParamField>
 
 <ParamField path="onSubmit" type="() => void" required>
-  Called when the user clicks the trailing icon button. Wire this to your search handler or comment submission function. Keyboard-based submission (Enter key) should be handled separately via the `onKeyDown` prop passed through `...rest`.
+  Called when the user clicks the trailing icon button. Wire this to your search handler or comment submission function. The component does not handle Enter-key submission internally — add an `onKeyDown` handler via `...rest` if keyboard submission is needed.
 </ParamField>
 
 <ParamField path="...rest" type="React.InputHTMLAttributes<HTMLInputElement>">

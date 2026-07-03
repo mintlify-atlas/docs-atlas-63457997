@@ -63,7 +63,7 @@ All routes nested under `/home/*` inherit this layout. It renders the **`Navbar`
 
 | Route | File | Description |
 |---|---|---|
-| `/` | `app/page.tsx` | Root landing page. Currently renders a minimal placeholder. |
+| `/` | `app/page.tsx` | Root route. Currently renders a bare `<div>HomePage</div>` stub — no content or redirect logic is implemented yet. |
 | `/login` | `app/login/page.tsx` | Login page. Renders the **`FormLogin`** component alongside the UVM Dev House branding headline. |
 | `/register` | `app/register/page.tsx` | Registration page. Renders the **`FormRegister`** component. On successful registration, redirects to `/login`. |
 
@@ -75,7 +75,7 @@ All routes below are under the `/home/:path*` middleware matcher and require a v
 |---|---|---|
 | `/home` | `app/home/page.tsx` | Main "Para ti" feed. Displays a list of **`CardPost`** components, a search bar (`InputWithIcon`), and a fixed floating **"Crear"** button (`PlusIcon`) in the bottom-right corner. Submitting the search bar navigates to `/home/search?query=…`. |
 | `/home/search` | `app/home/search/page.tsx` | Search results page. Includes the same search bar, a list of `CardPost` results, and a collapsible right-side filter panel with a **Tecnologias** dropdown and **Categorias / Clasificacion** sections. A separate **"Crear"** floating button is also present. |
-| `/home/post` | `app/home/post/page.tsx` | Component post detail view. Shows the post title, description, author info, publication date, tech-stack tags, star rating, action buttons (Share, Edit, Delete), a syntax-highlighted code block with a **"Descargar archivo"** button, and a fixed 300 px right-side **Comentarios** sidebar with an input field. |
+| `/home/post` | `app/home/post/page.tsx` | Component post detail view. Shows the post title, description, author info, publication date, tech-stack tags, star rating, a `DotsIcon` toggle button that reveals action buttons (Compartir, Editar, Eliminar), a code block with a **"Descargar archivo"** button, and a fixed 300 px right-side **Comentarios** sidebar with an input field. |
 | `/home/my-profile` | `app/home/my-profile/page.tsx` | Current user's profile page. Fetches user data via the `GET_USER` GraphQL query (using `session.user.id`). Renders `InfoProfile`, `Badge`, and a list of the user's `CardPost` components. An **"Editar perfil"** modal (`EditProfile`) overlays the page when activated. |
 | `/home/my-profile/settings` | `app/home/my-profile/settings/page.tsx` | Account settings page. The Navbar is **hidden** on this route, giving the layout full width. Contains a two-column layout: a left sidebar with anchor links (Administrar cuenta, Privacidad, Notificaciones) and a main panel with account controls (delete account, change password), privacy toggles (private account), and notification preferences (desktop + email) using `SwitchButton` components. |
 | `/home/followers` | *(linked from Navbar)* | Following feed. Shows posts from users the current user follows. Linked from the **Siguiendo** (`UserCheck` icon) nav item. |
@@ -118,13 +118,15 @@ The provider nesting order in the root layout matters. `SessionWrapper` must sit
 
 ```tsx
 // app/layout.tsx (conceptual structure)
-<ApolloWrapper>
-  <SessionProvider>
+<SessionWrapper>
+  <ApolloWrapper>
     {children}
-  </SessionProvider>
-</ApolloWrapper>
+  </ApolloWrapper>
+</SessionWrapper>
 ```
 
 <Note>
   `ApolloWrapper` uses `ApolloNextAppProvider` from `@apollo/experimental-nextjs-app-support`, which creates separate Apollo Client instances for SSR and the browser. On the server (`typeof window === "undefined"`), it chains `SSRMultipartLink` (with `stripDefer: true`) before the `HttpLink` so deferred queries are fully resolved during server rendering. On the client, only the `HttpLink` is used. All requests target `http://localhost:4000/graphql` with `cache: "no-store"` to avoid stale data.
+
+  **Note on port discrepancy:** The hardcoded GraphQL URI is `http://localhost:4000/graphql`, but the backend server is configured to listen on port **4005**. This mismatch means GraphQL requests will fail in a default local setup unless the URI in `apollo-wrapper.tsx` is updated to match the actual server port.
 </Note>

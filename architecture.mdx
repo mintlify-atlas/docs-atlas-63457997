@@ -160,6 +160,10 @@ Browser
 - Apollo Server receives the operation, runs the matching resolver, and delegates all data access to Prisma.
 - Prisma translates the resolver calls into optimized SQL and executes them against MySQL, returning typed result objects back up the chain.
 
+<Warning>
+  **Port mismatch in Apollo Client configuration.** The server defaults to port **4005** (`process.env.PORT || 4005` in `server/src/index.ts`), but both `frontend/app/lib/apollo-wrapper.tsx` and `frontend/app/lib/client.ts` hardcode `http://localhost:4000/graphql` as the GraphQL URI. This means Apollo Client requests will fail out of the box. You must update the `uri` value in both files to `http://localhost:4005/graphql` to match the running server, or set a custom `PORT` env variable and update accordingly.
+</Warning>
+
 ## Data Models
 
 The following models are defined in `server/prisma/schema.prisma` and represent the full relational schema of the application:
@@ -172,7 +176,7 @@ The following models are defined in `server/prisma/schema.prisma` and represent 
 | `Rating` | A numeric `Float` rating given by a `User` to a `Post` |
 | `Technology` | A unique technology tag (e.g. `React`, `Vue`) that can be applied to posts via a `Stack` join |
 | `Stack` | Join table linking a `Post` to one or more `Technology` records (composite primary key) |
-| `Setting` | Per-user notification preferences (in-app and email toggles) with a one-to-one relation to `User` |
+| `Setting` | Per-user preferences: a `private` account toggle, in-app notification flags (`n_ratings`, `n_comments`, `n_followers`, `n_populates`), and matching email notification flags — one-to-one relation to `User` |
 | `Follower` | Self-referential many-to-many relationship on `User` tracking follower/following pairs (composite primary key) |
 
 <Info>

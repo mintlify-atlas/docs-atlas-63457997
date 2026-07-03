@@ -53,9 +53,31 @@ API_ROUTE="http://localhost:4005/graphql"
   Never commit `.env` or `.env.local` files to version control. Both the `server/` and `frontend/` directories should have `.gitignore` entries covering these files. Exposing `DATABASE_URL` or `NEXTAUTH_SECRET` in a public repository is a serious security risk.
 </Warning>
 
-<Note>
-  The Apollo Client defined in `frontend/app/lib/client.ts` currently hardcodes `http://localhost:4000/graphql` as the GraphQL URI used for server-component data fetching. If your backend runs on a different port (the default is `4005`), you must update that `uri` value in `client.ts` to match — `API_ROUTE` in `.env.local` only affects NextAuth authentication calls, not the Apollo Client.
-</Note>
+<Warning>
+  **Apollo Client port mismatch — manual fix required.**
+
+  Both Apollo Client files in the frontend hardcode port `4000` as the GraphQL endpoint, but the server defaults to port **`4005`** (defined in `server/src/index.ts` as `const PORT = process.env.PORT || 4005`). This means Apollo Client queries will fail out of the box unless you update those files manually — `API_ROUTE` in `.env.local` only affects NextAuth authentication calls, not Apollo Client.
+
+  **`frontend/app/lib/client.ts`** — update the `uri` on line 9:
+  ```typescript
+  // Before (incorrect):
+  uri: `http://localhost:4000/graphql`
+
+  // After (correct):
+  uri: `http://localhost:4005/graphql`
+  ```
+
+  **`frontend/app/lib/apollo-wrapper.tsx`** — update the `uri` on line 11:
+  ```typescript
+  // Before (incorrect):
+  uri: "http://localhost:4000/graphql",
+
+  // After (correct):
+  uri: "http://localhost:4005/graphql",
+  ```
+
+  If you have set a custom `PORT` in `server/.env`, use that port number instead of `4005` in both files above.
+</Warning>
 
 <Tip>
   Generate a strong `NEXTAUTH_SECRET` with a single terminal command:

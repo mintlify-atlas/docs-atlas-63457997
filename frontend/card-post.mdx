@@ -24,12 +24,10 @@ import CardPost from "@/components/ui/CardPost"
 
 ### Header
 
-The card header contains three elements arranged in a horizontal row:
+The card header is a `flex justify-between` row with two groups:
 
-- **Author avatar** — rendered with `UserIcon` (size `size-5`).
-- **Username link** — wrapped in a `<Link>` pointing to `/home/profile/:id`. Clicking navigates to the author's profile page.
-- **Follow/unfollow toggle** — a `Button` whose `variant` and label switch based on local `isFollowing` state (see [Follow Toggle](#follow--unfollow-toggle) below).
-- **Timestamp** — a muted `<span>` showing relative time (e.g. `18hrs`), styled with `opacity-75`.
+- **Left group** — a `<Link>` to `/home/profile/:id` that wraps the `UserIcon` (size `size-5`) and the username `<p>`, followed by the follow/unfollow `Button` whose `variant` and label switch based on local `isFollowing` state (see [Follow Toggle](#follow--unfollow-toggle) below).
+- **Timestamp** — a muted `<span>` showing relative time (e.g. `18hrs`), styled with `opacity-75`, pushed to the right end of the header.
 
 ### Body
 
@@ -42,7 +40,7 @@ The card body is split into a left content column and a right image column:
 
 ### Footer
 
-The card footer is separated from the body by a top border (`border-t border-seagreen-950/40 dark:border-white/40`) and contains four items:
+The card footer is separated from the body by a top border (`border-t border-seagreen-950/40 dark:border-white/40`) and contains five elements:
 
 | Element            | Detail                                                       |
 | ------------------ | ------------------------------------------------------------ |

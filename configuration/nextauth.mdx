@@ -1,5 +1,5 @@
 ---
-title: "Configure NextAuth Credentials Authentication"
+title: "Configure NextAuth.js Credentials Auth in Plataforma Social"
 sidebarTitle: "NextAuth Config"
 description: "How NextAuth.js is configured in Plataforma Social: the credentials provider, JWT and session callbacks, custom pages, and route protection."
 ---
@@ -143,7 +143,25 @@ Unauthenticated users who try to access a protected route will be redirected to 
 
 ## TypeScript type augmentation
 
-The project extends the default NextAuth types via a `next-auth.d.ts` declaration file, which adds the `id` and `username` fields to both the `Session` and `JWT` interfaces. This is required to avoid TypeScript errors when reading `session.user.id` or `token.username`, since those fields are not part of the NextAuth defaults.
+The project extends the default NextAuth types via `frontend/next-auth.d.ts`. This declaration file adds `id` and `username` to the `User` interface and replaces the `Session`'s `user` property with that extended `User` type. This is required to avoid TypeScript errors when reading `session.user.id` or `session.user.username`, since those fields are not part of the NextAuth defaults.
+
+```typescript
+import "next-auth";
+
+declare module "next-auth" {
+  interface User {
+    id: string;
+    username: string;
+    email: string;
+  }
+
+  interface Session {
+    user: User;
+  }
+}
+```
+
+Note that the `JWT` interface is **not** augmented in this file. The `jwt` callback in `route.ts` writes `id` and `username` onto the token at runtime, but the declaration file only types `User` and `Session`.
 
 ---
 

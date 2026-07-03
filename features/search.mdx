@@ -1,7 +1,7 @@
 ---
 title: "Search and Filter Open Source Components"
 sidebarTitle: "Search"
-description: "The search page at /home/search supports text queries and technology filters via URL query parameters, with a toggleable sidebar filter panel and CardPost results."
+description: "The /home/search page supports text queries and technology filters via URL params, with a toggleable filter sidebar and CardPost results grid."
 ---
 
 The search page at `/home/search` is the primary discovery surface on Plataforma Social. It renders the same `CardPost` grid as the main feed but layers on a text search bar and a collapsible filter sidebar so users can narrow results by technology, category, and rating. All search state lives in the URL — queries and filters are encoded as query parameters, making every search result shareable and bookmarkable with a direct link.
@@ -14,7 +14,12 @@ Both the home feed (`/home`) and the search page (`/home/search`) share the same
 // frontend/app/home/search/page.tsx
 function Search() {
   const [searchText, setSearchText] = useState('')
+  const [isFilterActive, setIsFilterActive] = useState(false)
   const router = useRouter();
+
+  const handleFilterState = () => {
+    setIsFilterActive(!isFilterActive)
+  }
 
   const handleSubmit = () => {
     router.push(`/home/search?query=${encodeURIComponent(searchText)}`);
@@ -36,7 +41,7 @@ function Search() {
         <CardPost/>
         <CardPost/>
       </section>
-      {/* sidebar — see below */}
+      {/* filter sidebar — see Filter Sidebar section below */}
     </>
   )
 }

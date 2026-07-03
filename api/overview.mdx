@@ -65,7 +65,7 @@ When an operation fails, Apollo Server returns an `errors` array in the response
 
 | Code | HTTP Status | Meaning |
 |------|-------------|---------|
-| `NOT_FOUND` | `404` | The requested user does not exist |
+| `NOT_FOUND` | `404` | The requested user does not exist. `getUser` returns `"Not found"`; `login` returns `"El usuario no fue encontrado"` |
 | Standard GraphQL error | `400` | Validation failure (e.g. duplicate username or email) |
 
 A typical error response looks like this:

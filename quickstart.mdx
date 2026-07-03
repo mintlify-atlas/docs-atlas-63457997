@@ -89,6 +89,10 @@ Before you begin, make sure the following are installed and available on your ma
     - `NEXTAUTH_SECRET` — a random string used to sign NextAuth session tokens (any secure random value works)
     - `NEXTAUTH_URL` — the canonical URL of the Next.js app, used by NextAuth for redirects
     - `API_ROUTE` — the full URL of the GraphQL endpoint that Apollo Client will send requests to
+
+    <Warning>
+      The Apollo Client files `frontend/app/lib/apollo-wrapper.tsx` and `frontend/app/lib/client.ts` currently **hardcode** `http://localhost:4000/graphql` as the GraphQL URI, but the server runs on port **4005** by default. The `API_ROUTE` env var above is correct, but it is not read by those files — they use the hardcoded value. You must manually update the `uri` in both files to `http://localhost:4005/graphql` (or your chosen `PORT`) before queries from the frontend will reach the running server.
+    </Warning>
   </Step>
 
   <Step title="Start the frontend">

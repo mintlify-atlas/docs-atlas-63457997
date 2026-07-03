@@ -29,13 +29,15 @@ Because the Navbar is a `"use client"` component, it has full access to React st
 
 ## Navigation Links
 
+Above the primary nav, the sidebar has a **logo button** ("UVM Dev House") rendered with `HomeIcon` at large size. This button uses the same `widthCondition` sizing as the nav links and collapses to icon-only mode when the notification panel is open.
+
 The primary `<nav>` lists six items. Each link is a Next.js `<Link>` wrapping a `<Button>` component. The active link is highlighted with `bg-lima-400/30 dark:bg-biscay-950` background classes. The current pathname is detected with `usePathname()` from `next/navigation`.
 
 | Label | Icon | Route | Description |
 |---|---|---|---|
 | Para ti | `HomeIcon` | `/home` | Main "for you" feed — all public posts. |
 | Siguiendo | `UserCheck` | `/home/followers` | Posts from users the current user follows. |
-| Populares | `TrendingIcon` | `/home/trending` | Trending / most-popular components. |
+| Populares | `TrendingIcon` | `/home/trending` | Trending / most-popular components. Note: the active-state check in the source currently compares against `"/home?page=trending"` rather than `"/home/trending"`, so the active highlight does not fire on this route. |
 | Buscar | `SearchIcon` | `/home/search` | Search results page with filter panel. |
 | Notificaciones | `BellIcon` | *(no href — toggles panel)* | Toggles the notifications side panel. |
 | Perfil | `UserIcon` | `/home/my-profile` | Current user's profile page. |
@@ -132,11 +134,59 @@ const logout = async () => {
 
 ## Dark Mode Toggle
 
-The `<ButtonDarkMode />` component is rendered inside the "Mas" user menu. Dark mode in Plataforma Social is **class-based**: toggling it adds or removes the `dark` class on the root `<html>` element.
+The `<ButtonDarkMode />` component is rendered inside the "Mas" user menu. It is a self-contained client component that reads and writes `localStorage` to persist the dark mode preference across page loads.
+
+Dark mode in Plataforma Social is **class-based**: toggling it adds or removes the `dark` class directly on `document.documentElement` (the `<html>` element). The component tracks its own `isDarkMode` boolean state, initialized from `localStorage.getItem('darkMode')` on first render:
+
+```tsx
+const [isDarkMode, setIsDarkMode] = useState(() => {
+  const savedMode = localStorage.getItem('darkMode');
+  return savedMode ? JSON.parse(savedMode) : false;
+});
+
+const toggleDarkMode = () => {
+  const newMode = !isDarkMode;
+  setIsDarkMode(newMode);
+  localStorage.setItem('darkMode', JSON.stringify(newMode));
+  document.documentElement.classList.toggle('dark', newMode);
+};
+```
+
+The button label and icon change dynamically based on the current state:
+
+| State | Label | Icon |
+|---|---|---|
+| Dark mode **off** | `Modo Claro` | `LightIcon` |
+| Dark mode **on** | `Modo Oscuro` | `MoonIcon` |
+
+A `useEffect` ensures `document.documentElement` stays in sync with the `isDarkMode` state value whenever it changes.
 
 <Tip>
-  Dark mode is configured in `tailwind.config.ts` with `darkMode: 'class'`. This means all `dark:` utility variants activate only when an ancestor element carries the `dark` class — the `ButtonDarkMode` component is responsible for setting and persisting this class on `document.documentElement`.
+  Dark mode is configured in `tailwind.config.ts` with `darkMode: 'class'`. This means all `dark:` utility variants activate only when an ancestor element carries the `dark` class — `ButtonDarkMode` is the sole component responsible for setting and persisting this class on `document.documentElement`.
 </Tip>
+
+---
+
+## SwitchButton Component
+
+`SwitchButton` is a small custom toggle used on the `/home/my-profile/settings` page for privacy and notification preferences. It renders a pill-shaped toggle track with a sliding white knob:
+
+```tsx
+function SwitchButton() {
+  const [checked, setChecked] = useState(true)
+  const handleChecked = () => { setChecked(!checked) }
+  return (
+    <div
+      className={`rounded-full w-12 h-6 p-0.5 ${checked ? 'bg-seagreen-900' : 'bg-storm-950'}`}
+      onClick={handleChecked}
+    >
+      <div className={`w-5 h-full bg-white rounded-full transition duration-500 ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
+    </div>
+  )
+}
+```
+
+The knob slides right (`translate-x-6`) when `checked` is `true` (active) and returns to the left (`translate-x-0`) when `false`. The track background switches between `seagreen-900` (on) and `storm-950` (off). Each `SwitchButton` instance manages its own independent state — there is no shared store or form submission wired up yet.
 
 ---
 

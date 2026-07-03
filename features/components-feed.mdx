@@ -111,7 +111,7 @@ Clicking a post title navigates to the full detail view. The page is split into 
 
 ### Action Menu (DotsIcon)
 
-The stats bar includes a `DotsIcon` button that toggles `isMore` state. When expanded, three additional action buttons appear:
+The stats bar includes a `DotsIcon` button (`color='primary' variant='flat' shape='full'`) that toggles `isMore` state. When expanded, three additional action buttons appear:
 
 ```typescript
 // frontend/app/home/post/page.tsx
@@ -123,13 +123,31 @@ const handleMore = () => {
 // Rendered when isMore === true:
 {isMore && (
   <>
-    <Button startContent={<ShareIcon className='size-5' />}>
+    <Button
+      className='px-3 py-1'
+      color='primary'
+      variant='outline'
+      shape='full'
+      startContent={<ShareIcon className='size-5' />}
+    >
       Compartir
     </Button>
-    <Button startContent={<EditIcon className='size-5' />}>
+    <Button
+      className='px-3 py-1'
+      color='primary'
+      variant='outline'
+      shape='full'
+      startContent={<EditIcon className='size-5' />}
+    >
       Editar
     </Button>
-    <Button color='destructive' startContent={<TrashIcon className='size-5' />}>
+    <Button
+      className='px-3 py-1'
+      color='destructive'
+      variant='outline'
+      shape='full'
+      startContent={<TrashIcon className='size-5' />}
+    >
       Eliminar
     </Button>
   </>

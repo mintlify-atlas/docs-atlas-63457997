@@ -124,6 +124,21 @@ The schema contains **8 models** that together represent users, their content, s
 | **Rating** | A numeric rating (Float) given by a user to a post. |
 | **Follower** | Self-referential join table on `User` representing follow relationships. |
 
+## GraphQL API Coverage
+
+Not all Prisma models are currently exposed through the GraphQL API. The Apollo Server schema in `server/src/graphql/typeDefs.ts` defines only four object types:
+
+| GraphQL Type | Backed by Prisma model |
+|---|---|
+| `User` | `User` |
+| `Setting` | `Setting` |
+| `UserWithSettings` | `User` + `Setting` (joined at login) |
+| `ResponseID` | — (generic mutation confirmation envelope) |
+
+<Note>
+  The `Post`, `Comment`, `Technology`, `Stack`, `Rating`, and `Follower` models exist in the database and are fully migrated, but they are **not yet exposed as GraphQL types**. They are ready for future API development. See the [Types reference](/api/types) for the full SDL of what is currently available.
+</Note>
+
 ## Key Relationships
 
 ### User → Setting
